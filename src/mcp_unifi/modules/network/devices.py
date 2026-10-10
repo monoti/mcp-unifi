@@ -21,6 +21,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -183,7 +184,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(devices))
         except UniFiError as exc:
             logger.exception("list_devices failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("restart_device", mutates=True)
@@ -229,7 +230,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json({"restarted": True, "mac": mac})
         except UniFiError as exc:
             logger.exception("restart_device failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     # Classified mutating: no configuration changes, but the device's status LED
@@ -280,7 +281,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json({"locating": on, "mac": mac})
         except UniFiError as exc:
             logger.exception("locate_device failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("set_port_state", mutates=True)
@@ -360,7 +361,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 "set_port_state failed",
                 extra={"mac": device_mac, "port_idx": port_idx},
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_device_radios", mutates=False)
@@ -400,7 +401,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(_project_radio_view(device_mac, device, radio_table)))
         except UniFiError as exc:
             logger.exception("get_device_radios failed", extra={"mac": device_mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     async def _apply_radio_patch(
         action: str,
@@ -480,7 +481,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("%s failed", action, extra={"mac": device_mac, "band": band})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("set_radio_tx_power", mutates=True)
@@ -712,4 +713,4 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("rename_device failed", extra={"mac": device_mac})
-            return err(str(exc))
+            return err(safe_error(exc))

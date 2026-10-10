@@ -26,6 +26,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_unifi.annotations import DESTRUCTIVE_ONCE
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.modules._audit import annotate_audit, audited
 from mcp_unifi.modules.network._common import make_err
@@ -88,7 +89,7 @@ def register(mcp: FastMCP, settings: Settings, _registry: ControllerRegistry) ->
                 "confirm_destructive_action failed",
                 extra={"action": pending.action, "controller": pending.controller},
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
 
 __all__ = ["register"]

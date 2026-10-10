@@ -20,48 +20,23 @@ from mcp_unifi.clients.errors import UniFiError, UniFiUnsupportedError
 from mcp_unifi.clients.ids import path_segment
 from mcp_unifi.clients.retry import request_with_retry
 from mcp_unifi.models import UniFiRecord
-from mcp_unifi.redaction import redact
 
 logger = logging.getLogger("mcp_unifi.client")
 
 
 def _describe_error_body(resp: httpx.Response) -> str:
-    """Describe an error body without pasting 300 raw characters into a result.
-
-    This message reaches a tool result, which goes straight into an agent's
-    context. UniFi's own error shape is ``{"meta": {"rc": "error", "msg":
-    "api.err.NoSiteContext"}}`` and that msg is exactly what an operator needs,
-    so it is kept. Anything else is not: a controller mid-upgrade serves an
-    HTML page, and a reverse proxy in front of it serves its own.
-
-    The parsed body is passed through :func:`redact` before anything is read
-    out of it. That is belt and braces rather than a known leak -- a UniFi
-    error envelope carries a code, not a record -- but this is the one repo in
-    the fleet whose payloads routinely contain WPA keys, and an error path that
-    reads a controller response without redacting it is the wrong shape to
-    leave lying around for the next endpoint that gets added here.
-    """
+    """Return an allowlisted diagnostic, never controller-provided prose."""
     try:
         payload = resp.json()
-    except Exception:
+    except ValueError:
         payload = None
-
     if isinstance(payload, dict):
-        safe = redact(payload)
-        meta = safe.get("meta")
-        if isinstance(meta, dict):
-            msg = meta.get("msg")
-            if isinstance(msg, str) and msg:
-                return f": {msg[:200]}"
-        for key in ("message", "error", "detail"):
-            value = safe.get(key)
-            if isinstance(value, str) and value:
-                return f": {value[:200]}"
-
-    if not resp.text:
-        return ""
-    content_type = resp.headers.get("content-type", "unknown")
-    return f" (non-JSON body: {content_type}, {len(resp.text)} bytes)"
+        meta = payload.get("meta")
+        if isinstance(meta, dict) and meta.get("msg") == "api.err.NoSiteContext":
+            return ": api.err.NoSiteContext"
+    if resp.headers.get("content-type", "").split(";")[0] == "text/html":
+        return f" (non-JSON body: text/html, {len(resp.content)} bytes)"
+    return ""
 
 
 class UniFiClient:
@@ -126,9 +101,7 @@ class UniFiClient:
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(
-                f"UniFi {method} {path} returned {resp.status_code}: {resp.text[:300]}"
-            )
+            raise UniFiError(f"UniFi {method} {path} returned {resp.status_code}")
         if not resp.content:
             return None
         body = resp.json()
@@ -167,9 +140,7 @@ class UniFiClient:
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(
-                f"UniFi {method} (v2) {path} returned {resp.status_code}: {resp.text[:300]}"
-            )
+            raise UniFiError(f"UniFi {method} (v2) {path} returned {resp.status_code}")
         if not resp.content:
             return None
         return resp.json()

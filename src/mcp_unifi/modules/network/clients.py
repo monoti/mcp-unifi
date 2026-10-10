@@ -9,6 +9,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_unifi.annotations import DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -48,7 +49,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_clients())
         except UniFiError as exc:
             logger.exception("list_clients failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("block_client", mutates=True)
@@ -92,7 +93,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(blocked)
         except UniFiError as exc:
             logger.exception("block_client failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("unblock_client", mutates=True)
@@ -135,7 +136,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(unblocked)
         except UniFiError as exc:
             logger.exception("unblock_client failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     # Classified mutating: nothing is persisted, but it deauths a live client off
@@ -180,4 +181,4 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json({"reconnected": ok, "mac": mac})
         except UniFiError as exc:
             logger.exception("reconnect_client failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))

@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.ids import path_segment
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
@@ -63,7 +64,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_firewall_rules())
         except UniFiError as exc:
             logger.exception("list_firewall_rules failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_firewall_policies", mutates=False)
@@ -97,7 +98,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_firewall_policies())
         except UniFiError as exc:
             logger.exception("list_firewall_policies failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_firewall_zones", mutates=False)
@@ -126,7 +127,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_firewall_zones())
         except UniFiError as exc:
             logger.exception("list_firewall_zones failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("create_firewall_rule", mutates=True)
@@ -244,7 +245,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 try:
                     payload[label] = [path_segment(group_id, label) for group_id in group_ids]
                 except UniFiError as exc:
-                    return err(str(exc))
+                    return err(safe_error(exc))
         if logging:
             payload["logging"] = True
         if dry_run:
@@ -261,7 +262,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_firewall_rule(payload))
         except UniFiError as exc:
             logger.exception("create_firewall_rule failed", extra={"rule_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_firewall_rule", mutates=True)
@@ -325,7 +326,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json({**(record or {}), "rule_id": rule_id, "verification": verification})
         except UniFiError as exc:
             logger.exception("update_firewall_rule failed", extra={"rule_id": rule_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_firewall_rule", mutates=True)
@@ -373,7 +374,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "delete_firewall_rule preview lookup failed", extra={"rule_id": rule_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next((r for r in rules if isinstance(r, dict) and r.get("_id") == rule_id), None)
         if target is None:
@@ -393,7 +394,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "rule_id": rule_id})
             except UniFiError as exc:
                 logger.exception("delete_firewall_rule failed", extra={"rule_id": rule_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_firewall_rule",
@@ -432,7 +433,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_firewall_groups())
         except UniFiError as exc:
             logger.exception("list_firewall_groups failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_firewall_group_details", mutates=False)
@@ -458,7 +459,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             groups = await backend.list_firewall_groups()
         except UniFiError as exc:
             logger.exception("get_firewall_group_details failed", extra={"group_id": group_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         target = next((g for g in groups if isinstance(g, dict) and g.get("_id") == group_id), None)
         if target is None:
             return err(f"firewall group {group_id} not found")
@@ -522,7 +523,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_firewall_group(payload))
         except UniFiError as exc:
             logger.exception("create_firewall_group failed", extra={"group_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_firewall_group", mutates=True)
@@ -566,7 +567,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             groups = await backend.list_firewall_groups()
         except UniFiError as exc:
             logger.exception("update_firewall_group lookup failed", extra={"group_id": group_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         existing = next(
             (g for g in groups if isinstance(g, dict) and g.get("_id") == group_id), None
         )
@@ -611,7 +612,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("update_firewall_group failed", extra={"group_id": group_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_firewall_group", mutates=True)
@@ -660,7 +661,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "delete_firewall_group preview lookup failed", extra={"group_id": group_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next((g for g in groups if isinstance(g, dict) and g.get("_id") == group_id), None)
         if target is None:
@@ -678,7 +679,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "group_id": group_id})
             except UniFiError as exc:
                 logger.exception("delete_firewall_group failed", extra={"group_id": group_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_firewall_group",

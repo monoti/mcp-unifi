@@ -42,7 +42,7 @@ Design notes
   the sink — sensitive keys (``passphrase``, ``api_key``, ``password``,
   ``secret``, ``token``, etc.) become ``"***"``. We do not pre-scrub here; one
   redaction pass keeps the contract in one place.
-* On exception the decorator records ``success=False`` with ``error=str(exc)``
+* On exception the decorator records ``success=False`` with ``error=safe_error(exc)``
   and re-raises. The audit emit itself never blocks the exception path —
   sink errors are caught and logged inside :class:`AuditLog.emit`.
 * Latency is wall-clock milliseconds measured around the wrapped coroutine.
@@ -78,6 +78,7 @@ from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
 from mcp_unifi import audit, telemetry
+from mcp_unifi.clients.errors import safe_error
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -246,7 +247,7 @@ def audited(
                         result=None,
                         success=False,
                         latency_ms=latency_ms,
-                        error=str(exc),
+                        error=safe_error(exc),
                         client_id=client_id,
                     )
                     raise
@@ -254,13 +255,19 @@ def audited(
                 _ANNOTATIONS.reset(annotations_token)
                 _apply_annotations()
                 latency_ms = (time.perf_counter() - start) * 1000.0
-                span.set(telemetry.ATTR_OUTCOME, telemetry.OUTCOME_OK)
+                decoded = _coerce_result(result)
+                span.set(
+                    telemetry.ATTR_OUTCOME,
+                    telemetry.OUTCOME_ERROR
+                    if isinstance(decoded, dict) and decoded.get("error")
+                    else telemetry.OUTCOME_OK,
+                )
                 await log.emit(
                     controller=controller,
                     tool=tool_name,
                     args=audit_args,
                     result=_coerce_result(result),
-                    success=True,
+                    success=not (isinstance(decoded, dict) and bool(decoded.get("error"))),
                     latency_ms=latency_ms,
                     client_id=client_id,
                 )

@@ -22,6 +22,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import READ_ONLY
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -96,7 +97,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_doors())
         except UniFiError as exc:
             logger.exception("list_doors failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_door", mutates=False)
@@ -123,7 +124,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(door)
         except UniFiError as exc:
             logger.exception("get_door failed", extra={"door_id": door_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_door_groups", mutates=False)
@@ -145,7 +146,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_door_groups())
         except UniFiError as exc:
             logger.exception("list_door_groups failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     # ------------------------------------------------------------------
     # Access policies (2)
@@ -173,7 +174,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_access_policies())
         except UniFiError as exc:
             logger.exception("list_access_policies failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_access_policy", mutates=False)
@@ -200,7 +201,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(policy)
         except UniFiError as exc:
             logger.exception("get_access_policy failed", extra={"policy_id": policy_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     # ------------------------------------------------------------------
     # Credentials (3)
@@ -231,7 +232,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.list_credentials()))
         except UniFiError as exc:
             logger.exception("list_credentials failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_credential", mutates=False)
@@ -258,7 +259,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(cred))
         except UniFiError as exc:
             logger.exception("get_credential failed", extra={"credential_id": credential_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("audit_expiring_credentials", mutates=False)
@@ -294,7 +295,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             credentials = await backend.list_credentials()
         except UniFiError as exc:
             logger.exception("audit_expiring_credentials failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         now_ms = int(time.time() * 1000)
         horizon_ms = now_ms + days_ahead * 86_400 * 1000
@@ -353,7 +354,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.list_visitors()))
         except UniFiError as exc:
             logger.exception("list_visitors failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_visitor", mutates=False)
@@ -379,7 +380,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(visitor))
         except UniFiError as exc:
             logger.exception("get_visitor failed", extra={"visitor_id": visitor_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     # ------------------------------------------------------------------
     # Events (4)
@@ -424,7 +425,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(events)
         except UniFiError as exc:
             logger.exception("list_access_events failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_recent_access_events", mutates=False)
@@ -452,7 +453,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(events)
         except UniFiError as exc:
             logger.exception("get_recent_access_events failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("summarize_access_activity", mutates=False)
@@ -482,7 +483,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             events = await backend.list_events(start_ms, end_ms, 500)
         except UniFiError as exc:
             logger.exception("summarize_access_activity failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         total = len(events)
         granted = sum(1 for e in events if e.get("result") == "granted")
@@ -553,7 +554,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(events)
         except UniFiError as exc:
             logger.exception("list_failed_access_attempts failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     # ------------------------------------------------------------------
     # Devices (2)
@@ -581,7 +582,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_devices())
         except UniFiError as exc:
             logger.exception("list_access_devices failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_access_device", mutates=False)
@@ -608,7 +609,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(device)
         except UniFiError as exc:
             logger.exception("get_access_device failed", extra={"device_id": device_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     # ------------------------------------------------------------------
     # System (2)
@@ -636,7 +637,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_system_info())
         except UniFiError as exc:
             logger.exception("get_access_system_info failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_access_users", mutates=False)
@@ -659,7 +660,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_users())
         except UniFiError as exc:
             logger.exception("list_access_users failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
 
 __all__ = ["register"]

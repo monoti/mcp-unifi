@@ -62,6 +62,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -254,7 +255,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             networks = await backend.list_networks()
         except UniFiError as exc:
             logger.exception("get_wan_ipv6 failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         wans = [n for n in networks if isinstance(n, dict) and n.get("purpose") == "wan"]
         if wan_name:
             wans = [w for w in wans if w.get("name") == wan_name]
@@ -415,7 +416,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("set_wan_ipv6 failed", extra={"wan_name": wan_name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("set_lan_ipv6", mutates=True)
@@ -551,7 +552,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             networks = await backend.list_networks()
         except UniFiError as exc:
             logger.exception("set_lan_ipv6 failed", extra={"network_id": network_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
         found = next(
             (n for n in networks if isinstance(n, dict) and n.get("_id") == network_id),
@@ -668,4 +669,4 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("set_lan_ipv6 failed", extra={"network_id": network_id})
-            return err(str(exc))
+            return err(safe_error(exc))

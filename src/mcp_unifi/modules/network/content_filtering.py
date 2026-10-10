@@ -32,6 +32,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -82,7 +83,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_content_filters())
         except UniFiError as exc:
             logger.exception("list_content_filters failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_content_filter_details", mutates=False)
@@ -109,7 +110,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             target = await _find_filter(backend, filter_id)
         except UniFiError as exc:
             logger.exception("get_content_filter_details failed", extra={"filter_id": filter_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if target is None:
             return err(f"content filter {filter_id} not found")
         return format_json(target)
@@ -160,7 +161,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             existing = await _find_filter(backend, filter_id)
         except UniFiError as exc:
             logger.exception("update_content_filter lookup failed", extra={"filter_id": filter_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if existing is None:
             return err(f"content filter {filter_id} not found")
         if dry_run:
@@ -183,7 +184,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("update_content_filter failed", extra={"filter_id": filter_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_content_filter", mutates=True)
@@ -232,7 +233,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "delete_content_filter preview lookup failed", extra={"filter_id": filter_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
         if target is None:
             return err(f"content filter {filter_id} not found")
 
@@ -248,7 +249,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "filter_id": filter_id})
             except UniFiError as exc:
                 logger.exception("delete_content_filter failed", extra={"filter_id": filter_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_content_filter",

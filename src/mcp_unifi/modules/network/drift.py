@@ -62,6 +62,7 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from mcp_unifi.annotations import READ_ONLY
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -557,7 +558,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
 
         drifts: list[dict[str, Any]] = []
         # Always pull networks because WLANs reference them.
@@ -565,7 +566,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             actual_networks = list(await backend.list_networks())
         except UniFiError as exc:
             logger.exception("audit_network_drift: list_networks failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         if "networks" in spec:
             spec_networks = spec.get("networks") or []
@@ -581,7 +582,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 actual_wlans = list(await backend.list_wlans())
             except UniFiError as exc:
                 logger.exception("audit_network_drift: list_wlans failed")
-                return err(str(exc))
+                return err(safe_error(exc))
             drifts.extend(_diff_wlans(spec_wlans, actual_wlans, actual_networks))
 
         if "firewall_rules" in spec:
@@ -592,7 +593,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 actual_rules = list(await backend.list_firewall_rules())
             except UniFiError as exc:
                 logger.exception("audit_network_drift: list_firewall_rules failed")
-                return err(str(exc))
+                return err(safe_error(exc))
             drifts.extend(_diff_firewall_rules(spec_rules, actual_rules))
 
         if "firewall_policies" in spec:
@@ -604,7 +605,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 zones = list(await backend.list_firewall_zones())
             except UniFiError as exc:
                 logger.exception("audit_network_drift: list_firewall_policies failed")
-                return err(str(exc))
+                return err(safe_error(exc))
             drifts.extend(_diff_firewall_policies(spec_policies, actual_policies, zones))
 
         in_sync = len(drifts) == 0

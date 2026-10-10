@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY
 from mcp_unifi.backends import Backend
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -81,7 +82,7 @@ async def _delete_resource(backend: Backend, kind: str, resource_id: str) -> boo
     except UniFiError as exc:
         logger.error(
             "rollback delete failed",
-            extra={"kind": kind, "resource_id": resource_id, "error": str(exc)},
+            extra={"kind": kind, "resource_id": resource_id, "error": safe_error(exc)},
         )
         return False
 
@@ -216,7 +217,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         created: dict[str, Any] = {
             "network": None,
             "wlan": None,
@@ -410,7 +411,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         created: dict[str, Any] = {
             "lease": None,
             "firewall_rule": None,
@@ -539,7 +540,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json({"quarantined": True, "mac": mac, "reason": reason})
         except UniFiError as exc:
             logger.exception("quarantine_client failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("create_guest_network", mutates=True)
@@ -672,7 +673,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         created: dict[str, Any] = {
             "network": None,
             "wlan": None,
@@ -835,7 +836,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 zones = list(await backend.list_firewall_zones())
             except UniFiError as exc:
                 logger.warning("audit_open_ports: zone-based firewall read failed: %s", exc)
-                policies_error = str(exc)
+                policies_error = safe_error(exc)
 
             wan_ids = wan_zone_ids(zones)
             zone_names = zone_names_by_id(zones)
@@ -931,4 +932,4 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(result)
         except UniFiError as exc:
             logger.exception("audit_open_ports failed")
-            return err(str(exc))
+            return err(safe_error(exc))

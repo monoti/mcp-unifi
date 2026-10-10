@@ -24,3 +24,10 @@ class UniFiUnsupportedError(UniFiError):
 
 
 __all__ = ["UniFiError", "UniFiUnsupportedError"]
+
+
+def safe_error(exc: Exception) -> str:
+    """Return controlled diagnostics without external exception messages."""
+    if isinstance(exc, UniFiError):
+        return str(exc)
+    return f"Operation failed ({type(exc).__name__})."

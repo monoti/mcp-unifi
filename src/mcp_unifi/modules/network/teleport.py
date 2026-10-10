@@ -36,6 +36,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -103,7 +104,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             networks_raw = await backend.list_networks()
         except UniFiError as exc:
             logger.exception("get_teleport_config failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         vpn_networks = _wireguard_vpn_networks(list(networks_raw))
         # ``_wireguard_vpn_networks`` projects a fixed key list today, which is
@@ -167,7 +168,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             record = await backend.set_setting("teleport", patch)
         except UniFiError as exc:
             logger.exception("set_teleport_enabled failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         return format_json({"enabled": bool(record.get("enabled", False))})
 
 

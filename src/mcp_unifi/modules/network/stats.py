@@ -31,6 +31,7 @@ import time
 from typing import TYPE_CHECKING
 
 from mcp_unifi.annotations import READ_ONLY
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -73,7 +74,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_system_info())
         except UniFiError as exc:
             logger.exception("get_system_info failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_gateway_stats", mutates=False)
@@ -99,7 +100,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.get_gateway_stats()))
         except UniFiError as exc:
             logger.exception("get_gateway_stats failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_device_stats", mutates=False)
@@ -129,7 +130,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(record))
         except UniFiError as exc:
             logger.exception("get_device_stats failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_client_stats", mutates=False)
@@ -161,7 +162,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(record)
         except UniFiError as exc:
             logger.exception("get_client_stats failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_client_sessions", mutates=False)
@@ -202,7 +203,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_client_sessions(mac, start, end, limit))
         except UniFiError as exc:
             logger.exception("get_client_sessions failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_anomalies", mutates=False)
@@ -227,4 +228,4 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_anomalies())
         except UniFiError as exc:
             logger.exception("get_anomalies failed")
-            return err(str(exc))
+            return err(safe_error(exc))

@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -50,7 +51,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_dhcp_leases())
         except UniFiError as exc:
             logger.exception("list_dhcp_leases failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("create_static_dhcp_lease", mutates=True)
@@ -111,13 +112,13 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_dhcp_lease(payload))
         except UniFiError as exc:
             logger.exception("create_static_dhcp_lease failed", extra={"mac": mac})
-            if "api.err.MacUsed" in str(exc):
+            if "api.err.MacUsed" in safe_error(exc):
                 return err(
                     f"{mac} already has a user record on the controller (api.err.MacUsed), "
                     "so a new one cannot be created. Use update_static_dhcp_lease with the "
                     "same mac to set or change its reservation instead."
                 )
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_static_dhcp_lease", mutates=True)
@@ -195,7 +196,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(result)
         except UniFiError as exc:
             logger.exception("update_static_dhcp_lease failed", extra={"mac": mac})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_static_dhcp_lease", mutates=True)
@@ -244,7 +245,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "delete_static_dhcp_lease preview lookup failed", extra={"lease_id": lease_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next(
             (lease for lease in leases if isinstance(lease, dict) and lease.get("_id") == lease_id),
@@ -266,7 +267,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "lease_id": lease_id})
             except UniFiError as exc:
                 logger.exception("delete_static_dhcp_lease failed", extra={"lease_id": lease_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_static_dhcp_lease",

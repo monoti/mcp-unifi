@@ -92,6 +92,7 @@ from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import DESTRUCTIVE, READ_ONLY
 from mcp_unifi.backends import Backend
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -454,13 +455,13 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
 
         try:
             resources = await _snapshot(backend)
         except UniFiError as exc:
             logger.exception("backup_config: snapshot failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         # WLANs hold ``x_passphrase``; networks hold VPN key material. Both
         # go through the same sentinel pass, and either one setting the flag
@@ -593,7 +594,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
 
         # Snapshot the live controller (with _id preserved for delete dispatch).
         try:
@@ -607,7 +608,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             }
         except UniFiError as exc:
             logger.exception("restore_config: live snapshot failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         # Strip ids for matching.
         current = {k: [_strip(r) for r in v] for k, v in current_with_ids.items()}
@@ -684,7 +685,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                             extra={
                                 "type": rtype,
                                 "id": resource_id,
-                                "error": str(exc),
+                                "error": safe_error(exc),
                             },
                         )
                         actions.append({"type": rtype, "id": resource_id, "deleted": False})

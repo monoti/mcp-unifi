@@ -103,9 +103,7 @@ class ProtectClient:
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(
-                f"Protect {method} {path} returned {resp.status_code}: {resp.text[:300]}"
-            )
+            raise UniFiError(f"Protect {method} {path} returned {resp.status_code}")
         if not resp.content:
             return None
         return resp.json()
@@ -125,9 +123,7 @@ class ProtectClient:
             error_cls=UniFiError,
         )
         if resp.status_code >= 400:
-            raise UniFiError(
-                f"Protect {method} {path} returned {resp.status_code}: {resp.text[:300]}"
-            )
+            raise UniFiError(f"Protect {method} {path} returned {resp.status_code}")
         return resp.content
 
     @staticmethod

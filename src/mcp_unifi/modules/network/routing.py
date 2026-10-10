@@ -24,6 +24,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -69,7 +70,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_routes())
         except UniFiError as exc:
             logger.exception("list_routes failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_route_details", mutates=False)
@@ -93,7 +94,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             routes = await backend.list_routes()
         except UniFiError as exc:
             logger.exception("get_route_details failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         target = next((r for r in routes if isinstance(r, dict) and r.get("_id") == route_id), None)
         if target is None:
             return err(f"route {route_id} not found")
@@ -167,7 +168,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_route(payload))
         except UniFiError as exc:
             logger.exception("create_route failed", extra={"route_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_route", mutates=True)
@@ -216,7 +217,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("update_route failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_route", mutates=True)
@@ -262,7 +263,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             routes = await backend.list_routes()
         except UniFiError as exc:
             logger.exception("delete_route preview lookup failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next((r for r in routes if isinstance(r, dict) and r.get("_id") == route_id), None)
         if target is None:
@@ -281,7 +282,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "route_id": route_id})
             except UniFiError as exc:
                 logger.exception("delete_route failed", extra={"route_id": route_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_route",

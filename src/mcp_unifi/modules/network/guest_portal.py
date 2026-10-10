@@ -58,6 +58,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -171,7 +172,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             record = await backend.get_setting(SETTING_KEY)
         except UniFiError as exc:
             logger.exception("get_guest_portal failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         if not record:
             return err(
                 "The controller returned no 'guest_access' setting record. "
@@ -268,7 +269,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             current = await backend.get_setting(SETTING_KEY)
         except UniFiError as exc:
             logger.exception("set_guest_portal read failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         if not current:
             return err(
                 "The controller returned no 'guest_access' setting record to "
@@ -302,7 +303,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 fresh = await backend.get_setting(SETTING_KEY)
             except UniFiError as exc:
                 logger.exception("set_guest_portal confirm re-read failed")
-                return err(str(exc))
+                return err(safe_error(exc))
             if not fresh:
                 return err(
                     "The controller returned no 'guest_access' setting record "
@@ -315,7 +316,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 updated = await backend.set_setting(SETTING_KEY, desired)
             except UniFiError as exc:
                 logger.exception("set_guest_portal write failed")
-                return err(str(exc))
+                return err(safe_error(exc))
             return format_json(
                 {
                     "setting_key": SETTING_KEY,

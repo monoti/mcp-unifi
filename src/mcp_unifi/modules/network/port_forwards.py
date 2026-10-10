@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -49,7 +50,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_port_forwards())
         except UniFiError as exc:
             logger.exception("list_port_forwards failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("create_port_forward", mutates=True)
@@ -116,7 +117,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_port_forward(payload))
         except UniFiError as exc:
             logger.exception("create_port_forward failed", extra={"forward_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_port_forward", mutates=True)
@@ -189,7 +190,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("update_port_forward failed", extra={"forward_id": forward_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_port_forward", mutates=True)
@@ -237,7 +238,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "delete_port_forward preview lookup failed", extra={"forward_id": forward_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next(
             (f for f in forwards if isinstance(f, dict) and f.get("_id") == forward_id), None
@@ -260,7 +261,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "forward_id": forward_id})
             except UniFiError as exc:
                 logger.exception("delete_port_forward failed", extra={"forward_id": forward_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_port_forward",

@@ -24,6 +24,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -112,7 +113,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             networks = await _network_lookup(backend)
         except UniFiError as exc:
             logger.exception("list_honeypots failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         raw = record.get("honeypot", []) or []
         entries = [_enrich(e, networks) for e in raw if isinstance(e, dict)]
         return format_json(
@@ -162,7 +163,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             networks = await _network_lookup(backend)
         except UniFiError as exc:
             logger.exception("create_honeypot lookup failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         if network_id not in networks:
             return err(f"network {network_id} not found")
@@ -171,7 +172,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             record = await backend.get_setting("ips")
         except UniFiError as exc:
             logger.exception("create_honeypot ips lookup failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         existing = list(record.get("honeypot", []) or [])
         for entry in existing:
@@ -200,7 +201,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             await backend.set_setting("ips", patch)
         except UniFiError as exc:
             logger.exception("create_honeypot failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         return format_json(_enrich(new_entry, networks))
 
     @mcp.tool(annotations=DESTRUCTIVE)
@@ -251,7 +252,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             record = await backend.get_setting("ips")
         except UniFiError as exc:
             logger.exception("delete_honeypot lookup failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
         existing = list(record.get("honeypot", []) or [])
         target_entry: dict[str, Any] | None = None
@@ -282,7 +283,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": True, "honeypot_id": id})
             except UniFiError as exc:
                 logger.exception("delete_honeypot failed", extra={"honeypot_id": id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_honeypot",

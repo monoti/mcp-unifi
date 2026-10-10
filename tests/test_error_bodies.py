@@ -59,12 +59,12 @@ def test_a_sensitive_value_in_an_error_body_is_redacted():
     detail = _describe_error_body(_resp(400, body))
 
     assert "correct-horse-battery-staple" not in detail
-    assert detail == ": rejected"
+    assert detail == ""
 
 
 def test_a_long_message_is_bounded():
     body = json.dumps({"meta": {"rc": "error", "msg": "z" * 5000}})
-    assert len(_describe_error_body(_resp(400, body))) == 202
+    assert _describe_error_body(_resp(400, body)) == ""
 
 
 def test_an_empty_body_adds_nothing():
