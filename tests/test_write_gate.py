@@ -509,9 +509,9 @@ async def test_audit_sink_failure_does_not_break_the_refusal(
 # ---------------------------------------------------------------------------
 
 
-def test_readonly_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_readonly_defaults_on(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MCP_UNIFI_READONLY", raising=False)
-    assert Settings(stub_mode=True, auth_required=False).readonly is False
+    assert Settings(stub_mode=True, auth_required=False).readonly is True
 
 
 def test_readonly_reads_the_env_var(monkeypatch: pytest.MonkeyPatch) -> None:

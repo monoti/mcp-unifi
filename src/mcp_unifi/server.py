@@ -22,6 +22,7 @@ Transport: Streamable HTTP via FastMCP (current MCP spec).
 from __future__ import annotations
 
 import logging
+import os
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
@@ -106,6 +107,8 @@ def build_server(
             controller's Access backend. Mirrors ``protect`` for the Access
             module.
     """
+    if settings.mcp_transport == "stdio" and os.environ.get("MCP_UNIFI_AUDIT_SINK") == "stdout":
+        raise ValueError("stdout audit is incompatible with stdio MCP")
     stub_overrides: dict[str, Backend] | None = (
         {"default": StubBackend(stub)} if stub is not None else None
     )

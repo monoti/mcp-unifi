@@ -325,7 +325,7 @@ def build_registry(
                 host=ctrl.access_host,
                 api_key=ctrl.access_api_key.get_secret_value(),
                 port=ctrl.access_port,
-                verify_ssl=ctrl.verify_ssl,
+                verify_ssl=ctrl.access_tls_verify,
             )
             access_backends[ctrl.name] = AccessRealBackend(access_client)
 

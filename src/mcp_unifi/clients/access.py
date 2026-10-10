@@ -51,7 +51,7 @@ class AccessClient:
         host: str,
         api_key: str,
         port: int = 12445,
-        verify_ssl: bool | ssl.SSLContext = False,
+        verify_ssl: bool | ssl.SSLContext = True,
         timeout: float = 15.0,
     ) -> None:
         self.host = host

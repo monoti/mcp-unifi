@@ -58,7 +58,7 @@ class UniFiClient:
         api_key: str,
         port: int = 443,
         site: str = "default",
-        verify_ssl: bool | ssl.SSLContext = False,
+        verify_ssl: bool | ssl.SSLContext = True,
         timeout: float = 15.0,
     ) -> None:
         self.host = host
