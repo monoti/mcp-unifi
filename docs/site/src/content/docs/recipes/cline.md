@@ -4,6 +4,9 @@ title: Cline
 description: Wire mcp-unifi into Cline (VS Code MCP client).
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 Cline reads MCP server config from the VS Code settings UI (Cline → MCP Servers) or directly from `cline_mcp_settings.json`.
 
 ## Streamable HTTP (Docker)
@@ -12,10 +15,12 @@ Start the container. The HTTP transport is secure by default and refuses to star
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run -d --rm -p 3714:3714 \
+docker run -d --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=true \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  --name mcp-unifi ghcr.io/pete-builds/mcp-unifi:latest
+  --name mcp-unifi mcp-unifi-hardening:0.25.0
 ```
 
 Add to `cline_mcp_settings.json`, passing the same token as an `Authorization` header:

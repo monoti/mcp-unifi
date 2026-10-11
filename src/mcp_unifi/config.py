@@ -23,8 +23,7 @@ Every secret (``api_key``, ``access_api_key``, ``os_password``, the HTTP
 bearer tokens) also accepts a file-backed form (``api_key_file`` and so on,
 ``UNIFI_API_KEY_FILE`` / ``MCP_UNIFI_AUTH_TOKEN_FILE`` in the environment) for
 Docker and Kubernetes secret mounts. The value form keeps working; the file
-form is opt-in and, per ADR 0007, carries the hardened defaults inside it: a
-controller configured by ``api_key_file`` verifies TLS unless told not to.
+form is opt-in. Every controller verifies TLS unless explicitly configured otherwise.
 Design credit: the ``_default_tls_policy`` validator in PR #154 by
 @Taltos-ch (Taltos GmbH).
 """
@@ -121,11 +120,9 @@ class ControllerConfig(BaseModel):
     verify_ssl: bool = Field(
         default=True,
         description=(
-            "Verify the gateway's TLS certificate. False by default (ADR 0003: "
-            "consoles ship a self-signed certificate for an IP), except that a "
-            "controller configured with api_key_file defaults to true (ADR "
-            "0007). An explicit value always wins over either default. A "
-            "controller with pinned_cert verifies against that pin instead."
+            "Verify the gateway's TLS certificate. Defaults to true for every "
+            "credential source. A controller with pinned_cert verifies against "
+            "that pin instead."
         ),
     )
     pinned_cert: Path | None = Field(
@@ -408,8 +405,8 @@ class Settings(BaseSettings):
     unifi_verify_ssl: bool | None = Field(
         default=None,
         description=(
-            "Legacy verify_ssl. Unset resolves per controller: false, or true "
-            "when UNIFI_API_KEY_FILE is set (ADR 0007). Env var: UNIFI_VERIFY_SSL."
+            "Legacy verify_ssl. Unset resolves to true for every controller. "
+            "Env var: UNIFI_VERIFY_SSL."
         ),
     )
     unifi_protect_api: Literal["internal", "integration"] = Field(default="internal")

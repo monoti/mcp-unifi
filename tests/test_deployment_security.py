@@ -1,6 +1,11 @@
+import os
 from pathlib import Path
 
+import pytest
 import yaml
+
+from mcp_unifi.authority import secure_path
+from mcp_unifi.clients.errors import UniFiError
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,12 +31,14 @@ def test_helm_safe_defaults_and_audit_readiness():
     assert values["readinessProbe"]["httpGet"]["path"] == "/ready"
     assert values["image"]["repository"] == "mcp-unifi-hardening"
     assert values["securityContext"]["readOnlyRootFilesystem"] is True
+    assert "fsGroup" not in values["podSecurityContext"]
 
 
 def test_all_enabled_release_publishers_depend_on_exact_revision_ci():
     directory = ROOT / ".github/workflows"
     ci = yaml.safe_load((directory / "ci.yml").read_text())
     assert "workflow_call" in ci.get("on", ci.get(True))
+    assert "github.workflow" in ci["concurrency"]["group"]
     assert {"lint-and-type", "test", "build-and-scan"} <= ci["jobs"].keys()
     for name, publication in [
         ("release.yml", "publish"),
@@ -44,3 +51,18 @@ def test_all_enabled_release_publishers_depend_on_exact_revision_ci():
     registry = yaml.safe_load((directory / "publish-mcp.yml").read_text())
     assert set(registry["jobs"]) == {"publication-disabled"}
     assert registry["permissions"] == {"contents": "read"}
+
+
+def test_kubernetes_permission_rewriting_rejects_private_grants(tmp_path):
+    directory = tmp_path / "approvals"
+    directory.mkdir(mode=0o700)
+    grant = directory / "grant.json"
+    grant.touch(mode=0o600)
+    secure_path(directory, directory=True)
+    secure_path(grant, directory=False)
+    os.chmod(directory, 0o2750)  # noqa: S103
+    os.chmod(grant, 0o640)
+    with pytest.raises(UniFiError):
+        secure_path(directory, directory=True)
+    with pytest.raises(UniFiError):
+        secure_path(grant, directory=False)

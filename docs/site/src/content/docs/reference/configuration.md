@@ -4,6 +4,9 @@ title: Configuration
 description: Full env var reference for mcp-unifi.
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 All configuration is read from environment variables (and a `.env` file when present). Pydantic validates values at startup; invalid config fails fast with a clear message.
 
 ## Mode toggle
@@ -22,7 +25,7 @@ These env vars cover the single-controller case. When set without `MCP_UNIFI_CON
 | `UNIFI_API_KEY` | string | `""` | real mode | Local API key from **Settings → Control Plane → Integrations**. Or use `UNIFI_API_KEY_FILE` (below). |
 | `UNIFI_PORT` | int (1-65535) | `443` | no | HTTPS port for the gateway. |
 | `UNIFI_SITE` | string | `default` | no | Controller site identifier. Most setups have one site. |
-| `UNIFI_VERIFY_SSL` | bool | `false` (`true` with `UNIFI_API_KEY_FILE` or `UNIFI_PINNED_CERT`) | no | Set `true` once the gateway has a real TLS certificate. Left unset, it is `false` for an inline key and `true` for a file-backed or pinned one; an explicit value always wins. |
+| `UNIFI_VERIFY_SSL` | bool | `true` | no | Configure a trusted CA or independently verified pin. Both inline and file-backed credentials default to verified TLS; an explicit value wins. |
 | `UNIFI_PINNED_CERT` | path | (unset) | no | PEM certificate recorded by `mcp-unifi-pin-cert`. When set it is the only trust anchor for the controller; hostname matching is off because the pin is the identity; a mismatch fails every request. `UNIFI_VERIFY_SSL=false` alongside it is rejected at startup. See [Certificate pinning](#certificate-pinning). |
 | `UNIFI_PROTECT_API` | enum (`internal`, `integration`) | `internal` | no | Protect API surface for legacy single-controller config. `integration` uses `/proxy/protect/integration/v1` for UniFi OS 5.x API keys; events and recordings are unavailable there. |
 
@@ -57,8 +60,8 @@ Only required when `MCP_UNIFI_MODULES_ENABLED` includes `access` and `STUB_MODE=
 
 | Variable | Type | Default | Required | Notes |
 |---|---|---|---|---|
-| `MCP_TRANSPORT` | enum (`stdio`, `streamable-http`) | `streamable-http` | no | `stdio` for Claude Desktop / `uvx` / `.dxt` installs; `streamable-http` for the long-running container. |
-| `MCP_HOST` | string | `0.0.0.0` | no | Bind address (Streamable HTTP only). |
+| `MCP_TRANSPORT` | enum (`stdio`, `streamable-http`) | `stdio` | no | `stdio` for Claude Desktop / `uvx` / `.dxt` installs; `streamable-http` for the long-running container. |
+| `MCP_HOST` | string | `127.0.0.1` | no | Bind address (Streamable HTTP only). |
 | `MCP_PORT` | int (1-65535) | `3714` | no | Listen port (Streamable HTTP only). |
 
 ## HTTP authentication
@@ -76,7 +79,7 @@ Every secret has a `_FILE` twin for Docker and Kubernetes secret mounts. The val
 
 | Variable | Type | Default | Required | Notes |
 |---|---|---|---|---|
-| `UNIFI_API_KEY_FILE` | path | (unset) | no | File containing the local API key. Wins over `UNIFI_API_KEY`. Also turns `UNIFI_VERIFY_SSL` on by default. |
+| `UNIFI_API_KEY_FILE` | path | (unset) | no | File containing the local API key. Wins over `UNIFI_API_KEY`. TLS verification is on by default for all credential sources. |
 | `UNIFI_ACCESS_API_KEY_FILE` | path | (unset) | no | File containing the Access API key. Wins over `UNIFI_ACCESS_API_KEY`. |
 | `UNIFI_OS_PASSWORD_FILE` | path | (unset) | no | File containing the UniFi OS console password. Wins over `UNIFI_OS_PASSWORD`. The username is not a secret and has no file form. |
 | `MCP_UNIFI_AUTH_TOKEN_FILE` | path | (unset) | no | File holding either one bare bearer token, named by `MCP_UNIFI_CLIENT_ID`, or the same comma-separated grammar as `MCP_UNIFI_AUTH_TOKENS`. Its entries are added alongside `MCP_UNIFI_AUTH_TOKENS`; the two combine. Ignored on stdio. |
@@ -98,7 +101,7 @@ The pin covers the Network, Protect and console-session clients on that host. Th
 
 | Variable | Type | Default | Required | Notes |
 |---|---|---|---|---|
-| `MCP_UNIFI_READONLY` | bool | `false` | no | When `true`, every tool that changes state is hidden from `tools/list` and refused on `tools/call`. Applies to both transports. Refusals come back as the standard `{"error": ..., "stub_mode": ...}` envelope, so callers need no new error handling. See the [Security guide](/mcp-unifi/guides/security/#read-only-mode). |
+| `MCP_UNIFI_READONLY` | bool | `true` | no | When `true`, every tool that changes state is hidden from `tools/list` and refused on `tools/call`. Applies to both transports. Refusals come back as the standard `{"error": ..., "stub_mode": ...}` envelope, so callers need no new error handling. See the [Security guide](/mcp-unifi/guides/security/#read-only-mode). |
 
 Read-only mode is defense in depth on top of a read-only UniFi API key, not a
 replacement for one. The key decides what the controller will accept; this

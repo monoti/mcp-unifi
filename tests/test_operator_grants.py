@@ -315,3 +315,69 @@ async def test_confirmation_uses_original_exact_operator_grant(authority):
         row = connection.execute("SELECT intent,outcome FROM attempts").fetchone()
     assert json.loads(row[0])["tool"] == "delete_vlan"
     assert row[1] == "success"
+
+
+def test_operator_cli_hides_untrusted_validation_details(tmp_path, monkeypatch, capsys):
+    from mcp_unifi.cli import approve
+
+    secret = "synthetic-cli-secret"
+    arguments = tmp_path / "arguments.json"
+    arguments.write_text("{}")
+
+    async def reject(*args, **kwargs):
+        raise ValueError(secret)
+
+    monkeypatch.setattr(approve, "create_grant", reject)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "mcp-unifi-approve",
+            "--principal",
+            "alice",
+            "--controller",
+            "home",
+            "--tool",
+            "block_client",
+            "--arguments-file",
+            str(arguments),
+        ],
+    )
+    with pytest.raises(SystemExit) as raised:
+        approve.main()
+    assert raised.value.code == 2
+    output = capsys.readouterr()
+    assert secret not in output.err + output.out
+    assert "Approval failed" in output.err
+
+
+def test_journal_uses_directory_durable_sqlite_settings(authority):
+    with authority._connection() as connection:
+        assert connection.execute("PRAGMA synchronous").fetchone()[0] == 3
+        assert connection.execute("PRAGMA fullfsync").fetchone()[0] == 1
+    connection.close()
+
+
+async def test_journal_directory_sync_failure_blocks_consumption(authority, monkeypatch):
+    import os
+    import stat
+
+    original_sync = os.fsync
+
+    def fail_directory_sync(descriptor):
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise OSError("synthetic directory durability failure")
+        original_sync(descriptor)
+
+    operation = Operation("alice", "create_vlan", {"name": "test"})
+    grant(authority, operation)
+    monkeypatch.setattr(os, "fsync", fail_directory_sync)
+    token = OPERATION.set(operation)
+    try:
+        with pytest.raises(UniFiError):
+            await authority.begin("home", "default")
+    finally:
+        OPERATION.reset(token)
+    assert authority.healthy is False
+    assert not operation.attempts
+    with sqlite3.connect(authority.journal) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0

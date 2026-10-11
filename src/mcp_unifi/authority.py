@@ -122,13 +122,23 @@ class Authority:
                 os.close(descriptor)
         secure_path(self.journal)
         connection = sqlite3.connect(self.journal, timeout=10)
-        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA synchronous=EXTRA")
+        connection.execute("PRAGMA fullfsync=ON")
         connection.execute(
             "CREATE TABLE IF NOT EXISTS attempts "
             "(grant_id TEXT PRIMARY KEY, digest TEXT, intent TEXT, "
             "created REAL, outcome TEXT)"
         )
         connection.commit()
+        try:
+            descriptor = os.open(self.journal.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        except OSError:
+            connection.close()
+            raise
         return connection
 
     async def begin(self, controller: str, site: str) -> None:

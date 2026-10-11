@@ -16,8 +16,8 @@ Thanks for the interest. `mcp-unifi` is a personal project but PRs are welcome â
 uv venv && source .venv/bin/activate
 
 # Install with hash-locked deps
-uv pip sync requirements-dev.lock
-uv pip install -e . --no-deps
+uv pip sync requirements-build.lock requirements-dev.lock
+uv pip install -e . --no-deps --no-build-isolation
 
 # Test suite (currently ~880 tests; run `pytest --collect-only` for the exact
 # count). Coverage is gated at 80% branch coverage in CI.
@@ -78,10 +78,7 @@ git checkout main && git pull
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-The tag fans out to three workflows: `release.yml` (multi-arch build, cosign
-keyless signature, SLSA provenance, SBOM, `.dxt` bundle, GitHub release),
-`helm-release.yml`, and `publish-mcp.yml` (MCP Registry, which polls GHCR for
-up to 30 minutes waiting on the image the release build is still producing).
+The enabled image, DXT, Helm, and docs publication workflows require reusable CI for the exact triggering revision. Their verification concurrency groups include the caller workflow so channels cannot cancel each other. Registry publication is disabled until fork ownership and credentials are configured. Build DXT locally with `python scripts/build_dxt.py /new/output`; the builder verifies hash-locked dependencies, imports, version metadata, and entry points. This hardening task has not published a fork release.
 
 ## Scope
 

@@ -4,6 +4,9 @@ title: Migrate from v0.x
 description: Upgrade from v0.4.x to v0.5.x without changing your existing config.
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 The v0.5.x line introduces multi-site, dry-run, and the audit log on top of the v0.4.x Network surface. The changes are **additive**: existing v0.4.x configs continue to work unchanged. Read on for the few new env vars that unlock the new behavior when you want it.
 
 ## Env vars unchanged
@@ -46,12 +49,14 @@ To manage more than one controller, write a YAML file and point `MCP_UNIFI_CONTR
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run --rm -p 3714:3714 \
+docker run --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=false \
   -e MCP_UNIFI_CONTROLLERS_FILE=/etc/mcp-unifi/controllers.yaml \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
   -v ./controllers.yaml:/etc/mcp-unifi/controllers.yaml:ro \
-  ghcr.io/pete-builds/mcp-unifi:latest
+  mcp-unifi-hardening:0.25.0
 ```
 
 When `MCP_UNIFI_CONTROLLERS_FILE` is set, the legacy `UNIFI_HOST` / `UNIFI_API_KEY` env vars are ignored. See the [Multi-Site Setup guide](/mcp-unifi/guides/multi-site/) for the full schema, and the [Authentication guide](/mcp-unifi/guides/auth/) for the bearer-token model.
@@ -62,7 +67,9 @@ Both modules are opt-in. To load Protect and Access alongside Network, set `MCP_
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run --rm -p 3714:3714 \
+docker run --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=false \
   -e UNIFI_HOST=192.168.1.1 \
   -e UNIFI_API_KEY=<your-local-api-key> \
@@ -70,7 +77,7 @@ docker run --rm -p 3714:3714 \
   -e UNIFI_ACCESS_API_KEY=<your-access-api-key> \
   -e MCP_UNIFI_MODULES_ENABLED=network,protect,access \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  ghcr.io/pete-builds/mcp-unifi:latest
+  mcp-unifi-hardening:0.25.0
 ```
 
 `UNIFI_ACCESS_*` is only required when the `access` module is enabled in real mode. Subset the module list freely: `network,protect`, `protect`, `access`, etc. See the [Access Setup guide](/mcp-unifi/guides/access-setup/) for Access config details and the [Tool Manifest](/mcp-unifi/tools/) for the current tool surface.
@@ -83,13 +90,13 @@ For a long-running container, you'll want to mount that as a volume so it surviv
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run --rm -p 3714:3714 \
+docker run --rm -p 127.0.0.1:3714:3714 \
   -e UNIFI_HOST=192.168.1.1 \
   -e UNIFI_API_KEY=<your-local-api-key> \
   -e MCP_UNIFI_AUDIT_PATH=/var/log/mcp-unifi/audit.jsonl \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
   -v ./logs:/var/log/mcp-unifi \
-  ghcr.io/pete-builds/mcp-unifi:latest
+  mcp-unifi-hardening:0.25.0
 ```
 
 Or set `MCP_UNIFI_AUDIT_SINK=stdout` to route the log to the container's stdout for collection by Docker / Kubernetes log drivers. See the [Dry-Run & Audit Log guide](/mcp-unifi/guides/dry-run-audit/) for the field schema and replay tooling.

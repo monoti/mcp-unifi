@@ -4,6 +4,9 @@ title: Claude Code
 description: Register mcp-unifi with Claude Code over Streamable HTTP or stdio.
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 Claude Code is the fastest path to a working tool call. It supports both **Streamable HTTP** (point it at a running Docker container) and **stdio** (spawn `uvx mcp-unifi` per session).
 
 ## Streamable HTTP (Docker)
@@ -12,10 +15,12 @@ Start the container if you haven't already. The HTTP transport is secure by defa
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run -d --rm -p 3714:3714 \
+docker run -d --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=true \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  --name mcp-unifi ghcr.io/pete-builds/mcp-unifi:latest
+  --name mcp-unifi mcp-unifi-hardening:0.25.0
 ```
 
 Register it with Claude Code at user scope, passing the token as an `Authorization` header:
@@ -44,7 +49,7 @@ For when you'd rather not run a container. Claude Code spawns the server as a su
 ```bash
 claude mcp add --transport stdio --scope user unifi \
   --env STUB_MODE=true \
-  -- uvx --from git+https://github.com/pete-builds/mcp-unifi mcp-unifi
+  -- uvx --from /absolute/path/to/reviewed/mcp-unifi mcp-unifi
 ```
 
 For real mode, pass gateway env vars instead:
@@ -54,7 +59,7 @@ claude mcp add --transport stdio --scope user unifi \
   --env STUB_MODE=false \
   --env UNIFI_HOST=192.168.1.1 \
   --env UNIFI_API_KEY=<your-local-api-key> \
-  -- uvx --from git+https://github.com/pete-builds/mcp-unifi mcp-unifi
+  -- uvx --from /absolute/path/to/reviewed/mcp-unifi mcp-unifi
 ```
 
 ## Sample prompts

@@ -4,6 +4,9 @@ title: Getting Started
 description: What mcp-unifi is, prerequisites, and the four install paths.
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 `mcp-unifi` is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives any MCP-aware client (Claude Desktop, Claude Code, Cursor, Cline, custom agents) a typed surface area over a self-hosted UniFi gateway. It speaks to the gateway over the local API key, runs entirely on your network, and does not require a Site Manager / cloud account.
 
 The server covers three UniFi apps:
@@ -37,10 +40,12 @@ The fastest cold-start is **Docker + Claude Code in stub mode**. Mint a bearer t
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run -d --rm -p 3714:3714 \
+docker run -d --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=true \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  --name mcp-unifi ghcr.io/pete-builds/mcp-unifi:latest
+  --name mcp-unifi mcp-unifi-hardening:0.25.0
 
 claude mcp add --transport http --scope user unifi http://localhost:3714/mcp \
   --header "Authorization: Bearer $MCP_UNIFI_TOKEN"

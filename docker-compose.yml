@@ -31,8 +31,8 @@ services:
       # File-backed secrets (opt-in). Uncomment these two lines and the
       # `secrets:` blocks below, then leave UNIFI_API_KEY and
       # MCP_UNIFI_AUTH_TOKENS out of .env. A controller configured by
-      # UNIFI_API_KEY_FILE verifies TLS by default; set UNIFI_VERIFY_SSL=false
-      # in .env if the console still has its self-signed certificate.
+      # TLS verification is on for every credential source. Configure a
+      # trusted CA or independently verified certificate pin.
       # UNIFI_API_KEY_FILE: /run/secrets/unifi_api_key
       # MCP_UNIFI_AUTH_TOKEN_FILE: /run/secrets/mcp_unifi_token
       # MCP_UNIFI_CLIENT_ID: admin

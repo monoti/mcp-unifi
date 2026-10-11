@@ -78,16 +78,21 @@ def main() -> None:
     parser.add_argument("--arguments-file", required=True, type=Path)
     parser.add_argument("--ttl", type=int, default=300, choices=range(1, 3601))
     arguments = parser.parse_args()
-    path = asyncio.run(
-        create_grant(
-            Settings(),
-            identity=arguments.principal,
-            controller=arguments.controller,
-            tool_name=arguments.tool,
-            arguments=json.loads(arguments.arguments_file.read_text()),
-            ttl=arguments.ttl,
+    try:
+        path = asyncio.run(
+            create_grant(
+                Settings(),
+                identity=arguments.principal,
+                controller=arguments.controller,
+                tool_name=arguments.tool,
+                arguments=json.loads(arguments.arguments_file.read_text()),
+                ttl=arguments.ttl,
+            )
         )
-    )
+    except Exception as exc:
+        parser.error(
+            f"Approval failed ({type(exc).__name__}). Check protected configuration and arguments."
+        )
     print(path)
 
 

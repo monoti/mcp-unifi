@@ -26,12 +26,18 @@ spec:
       labels:
         {{- include "mcp-unifi.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if and (or .Values.audit.existingClaim .Values.authority.approvalClaim) (hasKey .Values.podSecurityContext "fsGroup") }}
+      {{- fail "Persistent private storage must be owner-provisioned without fsGroup permission rewriting." }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- if and (not .Values.audit.existingClaim) (not .Values.authority.approvalClaim) }}
+        fsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:

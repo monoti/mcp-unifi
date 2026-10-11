@@ -4,6 +4,9 @@ title: Cursor
 description: Wire mcp-unifi into Cursor's MCP config.
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 Cursor reads MCP server config from `.cursor/mcp.json` (project scope) or `~/.cursor/mcp.json` (user scope).
 
 ## Streamable HTTP (Docker)
@@ -27,10 +30,12 @@ Start the container in a separate terminal, passing the same token:
 
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run -d --rm -p 3714:3714 \
+docker run -d --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=true \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  --name mcp-unifi ghcr.io/pete-builds/mcp-unifi:latest
+  --name mcp-unifi mcp-unifi-hardening:0.25.0
 ```
 
 ## Stdio (uvx)
