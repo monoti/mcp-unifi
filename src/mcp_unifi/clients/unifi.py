@@ -25,7 +25,6 @@ logger = logging.getLogger("mcp_unifi.client")
 
 
 def _describe_error_body(resp: httpx.Response) -> str:
-    """Return an allowlisted diagnostic, never controller-provided prose."""
     try:
         payload = resp.json()
     except ValueError:

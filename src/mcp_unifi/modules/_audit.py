@@ -1,10 +1,3 @@
-"""Tool classification, trusted effective intent, audit and outcome recording.
-
-Real mutations cross the request guard in authority.py. This decorator captures
-validated arguments with defaults before execution and records whether the
-returned result succeeded. Failed persistence blocks later mutations.
-"""
-
 from __future__ import annotations
 
 import copy

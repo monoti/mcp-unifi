@@ -99,7 +99,6 @@ async def _write_record_matches_state(session: HarnessSession) -> CaseResult:
 
 
 async def _error_envelope_is_logged_as_a_dispatch(session: HarnessSession) -> CaseResult:
-    """A controller-side error records a failed result without a policy denial."""
     case = "error_envelope_is_logged_as_a_dispatch"
     payload = payload_of(
         await session.client.call_tool("get_network_details", {"network_id": "no-such-id"})

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -326,7 +327,7 @@ async def probe(repo: Path, output: Path):
                     assert denied(replay), "approval replay succeeded after server restart"
                     assert len(controller.mutations) == 1
             results["http"] = await check_http(scratch, env, config, cert, key, controller)
-            with sqlite3.connect(scratch / "mutations.sqlite3") as journal:
+            with closing(sqlite3.connect(scratch / "mutations.sqlite3")) as journal:
                 outcomes = journal.execute("SELECT outcome FROM attempts").fetchall()
                 rows = len(outcomes)
                 assert rows == 3, "durable one-use records missing"

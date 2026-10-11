@@ -1,5 +1,3 @@
-"""Operator grants and the durable boundary before real controller writes."""
-
 from __future__ import annotations
 
 import hashlib

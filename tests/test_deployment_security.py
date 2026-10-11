@@ -1,4 +1,5 @@
 import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -60,7 +61,8 @@ def test_kubernetes_permission_rewriting_rejects_private_grants(tmp_path):
     grant.touch(mode=0o600)
     secure_path(directory, directory=True)
     secure_path(grant, directory=False)
-    os.chmod(directory, 0o2750)  # noqa: S103
+    group_read_only = stat.S_IMODE(directory.stat().st_mode) | stat.S_IRGRP | stat.S_IXGRP
+    os.chmod(directory, group_read_only | stat.S_ISGID)
     os.chmod(grant, 0o640)
     with pytest.raises(UniFiError):
         secure_path(directory, directory=True)

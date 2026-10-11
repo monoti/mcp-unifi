@@ -19,7 +19,7 @@ For HTTP, set `MCP_TRANSPORT=streamable-http`. The host defaults to loopback. Ke
 
 ## Approving a real mutation
 
-Enabling the write catalog does not authorize a controller request. Real writes require all of these settings.
+Enabling the write catalog does not authorize a controller request. For a local deployment with a file audit log, configure these settings.
 
 | Setting | Purpose |
 | --- | --- |
@@ -28,7 +28,7 @@ Enabling the write catalog does not authorize a controller request. Real writes 
 | `MCP_UNIFI_STDIO_PRINCIPAL=alice` | Local stdio identity. HTTP uses the authenticated token identity. |
 | `MCP_UNIFI_APPROVAL_DIR=/protected/approvals` | Operator-issued grant files. |
 | `MCP_UNIFI_MUTATION_JOURNAL=/protected/state/mutations.sqlite` | Durable one-use journal. |
-| `MCP_UNIFI_AUDIT_SINK=file` | Durable sanitized audit. |
+| `MCP_UNIFI_AUDIT_SINK=file` | Additional sanitized file audit log. |
 | `MCP_UNIFI_AUDIT_PATH=/protected/state/audit.jsonl` | Audit file outside the read-only application filesystem. |
 
 Run the approval CLI outside the model's tool environment. Use the same controller, site, modules, and scope configuration as the server. Place the exact original tool arguments in a protected JSON file. Secrets participate in the digest before redaction.

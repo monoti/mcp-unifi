@@ -2,6 +2,7 @@ import asyncio
 import json
 import sqlite3
 import time
+from contextlib import closing
 
 import httpx
 import pytest
@@ -70,7 +71,7 @@ async def test_exact_grant_consumes_durably_and_omits_secrets(authority):
         authority.complete(operation, "success")
     finally:
         OPERATION.reset(token)
-    with sqlite3.connect(authority.journal) as connection:
+    with closing(sqlite3.connect(authority.journal)) as connection:
         rows = connection.execute("SELECT intent,outcome FROM attempts").fetchall()
     assert len(rows) == 1
     assert "synthetic-secret" not in rows[0][0]
@@ -311,7 +312,7 @@ async def test_confirmation_uses_original_exact_operator_grant(authority):
     result = await server.call_tool("confirm_destructive_action", {"token": token})
     assert '"deleted": true' in result.content[0].text
     assert deleted.call_count == 1
-    with sqlite3.connect(authority.journal) as connection:
+    with closing(sqlite3.connect(authority.journal)) as connection:
         row = connection.execute("SELECT intent,outcome FROM attempts").fetchone()
     assert json.loads(row[0])["tool"] == "delete_vlan"
     assert row[1] == "success"
@@ -379,5 +380,5 @@ async def test_journal_directory_sync_failure_blocks_consumption(authority, monk
         OPERATION.reset(token)
     assert authority.healthy is False
     assert not operation.attempts
-    with sqlite3.connect(authority.journal) as connection:
+    with closing(sqlite3.connect(authority.journal)) as connection:
         assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
