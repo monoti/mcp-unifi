@@ -6,6 +6,32 @@ Read [the finding map](../security-findings.md) for each repair and [the operato
 
 The design comparison selected the request guard immediately before backend I/O. It adopted caller-owned pending actions, audit health and readiness, and separate Access trust. A separate approval daemon and model-supplied approval arguments added operational complexity without the required benefit for this local deployment. Preview tokens alone do not authorize controller writes.
 
+Journal recovery adds version 2 approvals bound to an explicitly initialized generation. Server and issuer opens never recreate missing storage. Each continuation checks the live journal, and completion requires exactly one pending row. Read [the selected approval design](history/selected-design.md) and [the journal recovery design](history/journal-selected-design.md) for the contracts and rejected alternatives.
+
+## Final verified checkpoint
+
+[The revision record](verified-revision.json) names the reviewed and tested source commit. Later publication changes contain evidence and documentation only. They do not change the runtime, test, build, workflow, or deployment trees.
+
+| Check | Observed result | Evidence |
+| --- | --- | --- |
+| Complete pytest suite | 1400 passed, five existing warnings, 89.42 percent coverage. | [Raw suite output](evidence/full-suite.log). |
+| Actual stdio and HTTP MCP | 74 stdio tools, reads across three products, write refusal, authenticated scoped HTTP. | [Protocol results](evidence/protocol.json). |
+| Real HTTPS transport to isolated simulator | Zero unauthorized writes, four approved writes, four durable records, caller and replay refusal. | [Backend results](evidence/real-backend.json). |
+| Secret diagnostics | All eight leakage flags false. | [Diagnostics results](evidence/diagnostics.json). |
+| Darwin desktop artifact | Bundled MCP negotiation and reads passed; archive CRC and exact bundle bytes verified. | [Artifact results and checksum](evidence/desktop.json). |
+| Installed package advisories | 71 third-party packages audited with zero advisories; unpublished fork package skipped. | [Package audit](evidence/desktop-packages.json). |
+| Trivy assembled artifact scan | 72 installed packages detected; zero configured high or critical vulnerability or secret matches. | [Scanner output](evidence/desktop-trivy.json). |
+
+Ruff, mypy on 67 source files, actionlint, and the 160-page docs build also passed. Astro telemetry was disabled for the docs build because its preferences path is outside the restricted workspace. These results establish local behavior at the recorded revision.
+
+## Independent review and preserved decisions
+
+The final independent reviewers reported no new implementation findings. Read [Sol's final review](history/security-review-sol-r5.md), [Luna's final review](history/security-review-luna-r5.md), [Terra's final review](history/security-review-terra-r5.md), and [the parent triage](history/security-triage-r5.md). All prior reviews, accepted findings, responses, and selected design alternatives remain in [the history directory](history/).
+
+[The decision trail](decisions.tsv) preserves failed checks and later corrections. The two raw failing-test logs retain pytest whitespace. The full source whitespace check passes with exactly those two evidence files excluded. The initial failed review dispatches supplied no verdict. The earlier failed scanner download supplied no scan result; successful later scans close that check.
+
+The complete private working record remains in the local homelab audit directory. Private transcripts and credentials are excluded from this publication.
+
 ## Rerun the protocol checks
 
 Use Python 3.13 and install the hash-locked development dependencies in an isolated virtual environment. Run these commands from the repository root. Output files contain synthetic test results.

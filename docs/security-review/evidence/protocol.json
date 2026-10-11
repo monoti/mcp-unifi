@@ -1,4 +1,5 @@
 {
+  "repository": "/Users/monoti/projects/homelab/network/mcp-unifi",
   "defaults": {
     "readonly": true,
     "transport": "stdio",

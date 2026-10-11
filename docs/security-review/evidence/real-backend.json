@@ -11,8 +11,9 @@
   "verified_controller_tls": true,
   "read_calls": 2,
   "unauthorized_mutations": 0,
-  "externally_granted_mutations": 3,
+  "externally_granted_mutations": 4,
   "changed_arguments_denied": true,
   "restart_replay_denied": true,
-  "durable_attempts": 3
+  "fresh_identical_approval_succeeded": true,
+  "durable_attempts": 4
 }
