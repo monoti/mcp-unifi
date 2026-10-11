@@ -1,0 +1,18 @@
+{
+  "http": {
+    "writable_readiness": true,
+    "cross_principal_grant_denied": true,
+    "excluded_controller_requests": 0,
+    "cross_principal_confirmation_denied": true,
+    "owner_confirmation_succeeded": true,
+    "confirmation_replay_denied": true,
+    "approved_http_mutations": 2
+  },
+  "verified_controller_tls": true,
+  "read_calls": 2,
+  "unauthorized_mutations": 0,
+  "externally_granted_mutations": 3,
+  "changed_arguments_denied": true,
+  "restart_replay_denied": true,
+  "durable_attempts": 3
+}

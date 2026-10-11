@@ -1,0 +1,24 @@
+{
+  "defaults": {
+    "readonly": true,
+    "transport": "stdio",
+    "host": "127.0.0.1",
+    "verified_tls": true
+  },
+  "stdio": {
+    "listed_tools": 74,
+    "read_calls": 3,
+    "refused_writes": 1
+  },
+  "http": {
+    "listed_tools": 48,
+    "read_calls": 1,
+    "refused_writes": 1
+  },
+  "http_authorization": {
+    "missing_bearer_status": 401,
+    "invalid_bearer_status": 401,
+    "module_discovery_and_direct_call_denied": true
+  },
+  "audit_records": 11
+}

@@ -1,0 +1,20 @@
+{
+  "dependencies": [
+    {
+      "name": "setuptools",
+      "version": "84.0.0",
+      "vulns": []
+    },
+    {
+      "name": "wheel",
+      "version": "0.48.0",
+      "vulns": []
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "vulns": []
+    }
+  ],
+  "fixes": []
+}

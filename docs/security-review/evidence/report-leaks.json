@@ -1,0 +1,20 @@
+{
+  "upstream_commit": "b9870c768362d5e5b1321c7048a9fc7c035a9c59",
+  "hardened_commit": "9c4125e",
+  "flags": [
+    "controller_error_contains_secret",
+    "writable_preview_audit_contains_backup_secret",
+    "readonly_refusal_audit_contains_backup_secret"
+  ],
+  "before": [
+    true,
+    true,
+    true
+  ],
+  "after": [
+    false,
+    false,
+    false
+  ],
+  "data": "synthetic values only"
+}
