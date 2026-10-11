@@ -1,0 +1,339 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/monoti/projects/homelab/network/mcp-unifi-review-fixes
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, cov-7.1.0, hypothesis-6.168.4, asyncio-1.4.0, anyio-4.15.1, respx-0.23.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 22 items / 19 deselected / 3 selected
+
+tests/test_operator_grants.py FFF                                        [100%]
+
+=================================== FAILURES ===================================
+__________ test_consumed_earlier_filename_does_not_shadow_fresh_grant __________
+
+self = <mcp_unifi.authority.Authority object at 0x109641310>
+controller = 'home', site = 'default'
+
+    async def begin(self, controller: str, site: str) -> None:
+        self.check_scope(controller)
+        operation = OPERATION.get()
+        if self.readonly or operation is None or not operation.principal:
+            raise UniFiError("Real writes require writable mode and a trusted caller identity.")
+        if not self.healthy or self.grants is None:
+            raise UniFiError("Mutation approval or durable audit is unavailable.")
+        if controller not in self.scopes.get(operation.principal, []):
+            raise UniFiError("Writable callers require an explicit controller scope.")
+        key = (self, controller, site)
+        if key in operation.attempts:
+            return
+        digest = intent_digest(
+            operation.principal, controller, site, operation.tool, operation.arguments
+        )
+        secure_path(self.grants, directory=True)
+        matches: list[OperatorGrant] = []
+        for path in sorted(self.grants.glob("*.json")):
+            secure_path(path)
+            try:
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                with os.fdopen(descriptor) as file:
+                    grant = OperatorGrant.model_validate_json(file.read(16385))
+            except (OSError, ValueError) as exc:
+                raise UniFiError("Invalid operator grant file.") from exc
+            if (
+                grant.digest == digest
+                and grant.principal == operation.principal
+                and grant.controller == controller
+                and grant.site == site
+                and math.isfinite(grant.expires)
+                and time.time() < grant.expires <= time.time() + 3600
+            ):
+                matches.append(grant)
+        if not matches:
+            raise UniFiError("No exact unexpired operator grant authorizes this operation.")
+        from mcp_unifi import audit
+    
+        await audit.get_audit_log().emit(
+            controller=controller,
+            tool=operation.tool,
+            args=operation.arguments,
+            result={"phase": "intent"},
+            success=False,
+            latency_ms=0,
+            client_id=operation.principal,
+        )
+        if not audit.get_audit_log().healthy:
+            raise UniFiError("Audit is unhealthy. No controller write was made.")
+        grant = matches[0]
+        if time.time() >= grant.expires:
+            raise UniFiError("Operator grant expired before durable consumption.")
+        try:
+            with closing(self._connection()) as connection, connection:
+>               connection.execute(
+                    "INSERT INTO attempts VALUES (?, ?, ?, ?, ?)",
+                    (
+                        grant.id,
+                        digest,
+                        json.dumps(
+                            scrub(
+                                {
+                                    "tool": operation.tool,
+                                    "principal": operation.principal,
+                                    "controller": controller,
+                                    "site": site,
+                                    "arguments": operation.arguments,
+                                }
+                            )
+                        ),
+                        time.time(),
+                        "pending",
+                    ),
+                )
+E               sqlite3.IntegrityError: UNIQUE constraint failed: attempts.grant_id
+
+src/mcp_unifi/authority.py:196: IntegrityError
+
+The above exception was the direct cause of the following exception:
+
+authority = <mcp_unifi.authority.Authority object at 0x10811dfd0>
+
+    async def test_consumed_earlier_filename_does_not_shadow_fresh_grant(authority):
+        operation = Operation("alice", "create_vlan", {"name": "test"})
+        grant(authority, operation)
+        old_path = authority.grants / "000-old.json"
+        (authority.grants / "grant.json").rename(old_path)
+        token = OPERATION.set(operation)
+        try:
+            await authority.begin("home", "default")
+            authority.complete(operation, "success")
+        finally:
+            OPERATION.reset(token)
+        fresh = json.loads(old_path.read_text())
+        fresh["id"] = "fresh-grant"
+        path = authority.grants / "999-fresh.json"
+        path.write_text(json.dumps(fresh))
+        path.chmod(0o600)
+        restarted = Authority(
+            readonly=False, scopes=authority.scopes, grants=authority.grants, journal=authority.journal
+        )
+        token = OPERATION.set(Operation("alice", operation.tool, operation.arguments))
+        try:
+>           await restarted.begin("home", "default")
+
+tests/test_operator_grants.py:408: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <mcp_unifi.authority.Authority object at 0x109641310>
+controller = 'home', site = 'default'
+
+    async def begin(self, controller: str, site: str) -> None:
+        self.check_scope(controller)
+        operation = OPERATION.get()
+        if self.readonly or operation is None or not operation.principal:
+            raise UniFiError("Real writes require writable mode and a trusted caller identity.")
+        if not self.healthy or self.grants is None:
+            raise UniFiError("Mutation approval or durable audit is unavailable.")
+        if controller not in self.scopes.get(operation.principal, []):
+            raise UniFiError("Writable callers require an explicit controller scope.")
+        key = (self, controller, site)
+        if key in operation.attempts:
+            return
+        digest = intent_digest(
+            operation.principal, controller, site, operation.tool, operation.arguments
+        )
+        secure_path(self.grants, directory=True)
+        matches: list[OperatorGrant] = []
+        for path in sorted(self.grants.glob("*.json")):
+            secure_path(path)
+            try:
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+                with os.fdopen(descriptor) as file:
+                    grant = OperatorGrant.model_validate_json(file.read(16385))
+            except (OSError, ValueError) as exc:
+                raise UniFiError("Invalid operator grant file.") from exc
+            if (
+                grant.digest == digest
+                and grant.principal == operation.principal
+                and grant.controller == controller
+                and grant.site == site
+                and math.isfinite(grant.expires)
+                and time.time() < grant.expires <= time.time() + 3600
+            ):
+                matches.append(grant)
+        if not matches:
+            raise UniFiError("No exact unexpired operator grant authorizes this operation.")
+        from mcp_unifi import audit
+    
+        await audit.get_audit_log().emit(
+            controller=controller,
+            tool=operation.tool,
+            args=operation.arguments,
+            result={"phase": "intent"},
+            success=False,
+            latency_ms=0,
+            client_id=operation.principal,
+        )
+        if not audit.get_audit_log().healthy:
+            raise UniFiError("Audit is unhealthy. No controller write was made.")
+        grant = matches[0]
+        if time.time() >= grant.expires:
+            raise UniFiError("Operator grant expired before durable consumption.")
+        try:
+            with closing(self._connection()) as connection, connection:
+                connection.execute(
+                    "INSERT INTO attempts VALUES (?, ?, ?, ?, ?)",
+                    (
+                        grant.id,
+                        digest,
+                        json.dumps(
+                            scrub(
+                                {
+                                    "tool": operation.tool,
+                                    "principal": operation.principal,
+                                    "controller": controller,
+                                    "site": site,
+                                    "arguments": operation.arguments,
+                                }
+                            )
+                        ),
+                        time.time(),
+                        "pending",
+                    ),
+                )
+        except sqlite3.IntegrityError as exc:
+>           raise UniFiError("Operator grant has already been consumed.") from exc
+E           mcp_unifi.clients.errors.DiagnosticError: Operator grant has already been consumed.
+
+src/mcp_unifi/authority.py:217: DiagnosticError
+_____ test_cancelled_completion_blocks_readiness_and_later_requests[False] _____
+
+authority = <mcp_unifi.authority.Authority object at 0x1092c4190>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x1095e7770>
+body_raises = False
+
+    @pytest.mark.parametrize("body_raises", [False, True])
+    @respx.mock
+    async def test_cancelled_completion_blocks_readiness_and_later_requests(authority, monkeypatch, body_raises):
+        from mcp_unifi.modules import _audit
+        from mcp_unifi import server as server_module
+    
+        completion_entered = asyncio.Event()
+        context_after = []
+    
+        class BlockedCompletionSink:
+            async def write(self, event):
+                if event.result != {"phase": "intent"}:
+                    completion_entered.set()
+                    await asyncio.Event().wait()
+    
+            async def aclose(self):
+                pass
+    
+        client = UniFiClient("gateway.test", "synthetic")
+        CLIENTS[client._client] = Target(authority, "home", "default")
+        route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+            return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+        )
+    
+        @_audit.audited("completion_cancel_probe", mutates=True)
+        async def mutation():
+            await client.create_wlan({"name": "test"})
+            if body_raises:
+                raise RuntimeError("synthetic tool failure")
+            return {"created": True}
+    
+        operation = Operation("alice", "completion_cancel_probe", {})
+        grant(authority, operation)
+        registry = build_registry(Settings(stub_mode=True))
+        registry.authority = authority
+        monkeypatch.setattr(server_module, "build_registry", lambda *args, **kwargs: registry)
+        server = build_server(Settings(stub_mode=True, readonly=False, auth_required=False))
+        audit.set_audit_log(audit.AuditLog(BlockedCompletionSink()))
+    
+        async def invoke():
+            try:
+                await mutation()
+            finally:
+                context_after.append((OPERATION.get(), _audit._ANNOTATIONS.get()))
+    
+        task = asyncio.create_task(invoke())
+        try:
+            await asyncio.wait_for(completion_entered.wait(), timeout=5)
+            assert route.call_count == 1
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=5)
+            assert context_after == [(None, None)]
+>           assert authority.healthy is False
+E           assert True is False
+E            +  where True = <mcp_unifi.authority.Authority object at 0x1092c4190>.healthy
+
+tests/test_operator_grants.py:477: AssertionError
+_____ test_cancelled_completion_blocks_readiness_and_later_requests[True] ______
+
+authority = <mcp_unifi.authority.Authority object at 0x10a2a0c30>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10a213350>
+body_raises = True
+
+    @pytest.mark.parametrize("body_raises", [False, True])
+    @respx.mock
+    async def test_cancelled_completion_blocks_readiness_and_later_requests(authority, monkeypatch, body_raises):
+        from mcp_unifi.modules import _audit
+        from mcp_unifi import server as server_module
+    
+        completion_entered = asyncio.Event()
+        context_after = []
+    
+        class BlockedCompletionSink:
+            async def write(self, event):
+                if event.result != {"phase": "intent"}:
+                    completion_entered.set()
+                    await asyncio.Event().wait()
+    
+            async def aclose(self):
+                pass
+    
+        client = UniFiClient("gateway.test", "synthetic")
+        CLIENTS[client._client] = Target(authority, "home", "default")
+        route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+            return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+        )
+    
+        @_audit.audited("completion_cancel_probe", mutates=True)
+        async def mutation():
+            await client.create_wlan({"name": "test"})
+            if body_raises:
+                raise RuntimeError("synthetic tool failure")
+            return {"created": True}
+    
+        operation = Operation("alice", "completion_cancel_probe", {})
+        grant(authority, operation)
+        registry = build_registry(Settings(stub_mode=True))
+        registry.authority = authority
+        monkeypatch.setattr(server_module, "build_registry", lambda *args, **kwargs: registry)
+        server = build_server(Settings(stub_mode=True, readonly=False, auth_required=False))
+        audit.set_audit_log(audit.AuditLog(BlockedCompletionSink()))
+    
+        async def invoke():
+            try:
+                await mutation()
+            finally:
+                context_after.append((OPERATION.get(), _audit._ANNOTATIONS.get()))
+    
+        task = asyncio.create_task(invoke())
+        try:
+            await asyncio.wait_for(completion_entered.wait(), timeout=5)
+            assert route.call_count == 1
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=5)
+            assert context_after == [(None, None)]
+>           assert authority.healthy is False
+E           assert True is False
+E            +  where True = <mcp_unifi.authority.Authority object at 0x10a2a0c30>.healthy
+
+tests/test_operator_grants.py:477: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_operator_grants.py::test_consumed_earlier_filename_does_not_shadow_fresh_grant
+FAILED tests/test_operator_grants.py::test_cancelled_completion_blocks_readiness_and_later_requests[False]
+FAILED tests/test_operator_grants.py::test_cancelled_completion_blocks_readiness_and_later_requests[True]
+======================= 3 failed, 19 deselected in 1.03s =======================

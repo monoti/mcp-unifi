@@ -324,8 +324,8 @@ class Settings(BaseSettings):
             "If True, every tool that changes state is hidden from tools/list "
             "and refused on tools/call. Defense in depth on top of a read-only "
             "UniFi API key: the key is the authority, this makes the server "
-            "unable to try. Default False so existing deployments are "
-            "unaffected. Env var: MCP_UNIFI_READONLY."
+            "unable to try. Default True; writable operation requires "
+            "explicit opt-in. Env var: MCP_UNIFI_READONLY."
         ),
     )
 

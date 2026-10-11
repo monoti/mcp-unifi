@@ -135,10 +135,6 @@ def audited(
     def decorator(fn: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
         @wraps(fn)
         async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-            # Tools are always invoked with kwargs from FastMCP's JSON
-            # dispatch. Defensive: if any positional args slip through, capture
-            # them under a synthetic key so they aren't silently dropped from
-            # the audit envelope.
             bound = inspect.signature(fn).bind(*args, **kwargs)
             bound.apply_defaults()
             operation = Operation(principal(), tool_name, copy.deepcopy(dict(bound.arguments)))
@@ -158,68 +154,77 @@ def audited(
                 controller = str(annotations.get("controller", controller))
                 audit_args.update(annotations.get("args", {}))
 
-            # The span wraps the audit emit as well as the tool body, so its
-            # duration is the full cost of serving the call rather than just
-            # the controller round trip. That is the number an SLO is written
-            # against: a caller waits for both.
-            with telemetry.tool_span(
-                tool_name,
-                mutates=mutates,
-                controller=controller,
-                client_id=client_id,
-                dry_run=telemetry.coerce_dry_run(kwargs.get("dry_run")),
-            ) as span:
-                start = time.perf_counter()
-                try:
-                    result = await fn(*args, **kwargs)
-                except BaseException as exc:
-                    OPERATION.reset(operation_token)
-                    _ANNOTATIONS.reset(annotations_token)
+            completion_recorded = False
+            try:
+                with telemetry.tool_span(
+                    tool_name,
+                    mutates=mutates,
+                    controller=controller,
+                    client_id=client_id,
+                    dry_run=telemetry.coerce_dry_run(kwargs.get("dry_run")),
+                ) as span:
+                    start = time.perf_counter()
+                    try:
+                        result = await fn(*args, **kwargs)
+                    except BaseException as exc:
+                        _apply_annotations()
+                        latency_ms = (time.perf_counter() - start) * 1000.0
+                        span.record_error(exc)
+                        await log.emit(
+                            controller=controller,
+                            tool=tool_name,
+                            args=audit_args,
+                            result=None,
+                            success=False,
+                            latency_ms=latency_ms,
+                            error=safe_error(exc)
+                            if isinstance(exc, Exception)
+                            else "Call cancelled.",
+                            client_id=client_id,
+                        )
+                        for authority, _controller, _site in operation.attempts:
+                            authority.complete(operation, "uncertain")
+                        completion_recorded = True
+                        raise
+
                     _apply_annotations()
                     latency_ms = (time.perf_counter() - start) * 1000.0
-                    span.record_error(exc)
+                    decoded = _coerce_result(result)
+                    span.set(
+                        telemetry.ATTR_OUTCOME,
+                        telemetry.OUTCOME_ERROR
+                        if isinstance(decoded, dict) and decoded.get("error")
+                        else telemetry.OUTCOME_OK,
+                    )
                     await log.emit(
                         controller=controller,
                         tool=tool_name,
                         args=audit_args,
-                        result=None,
-                        success=False,
+                        result=_coerce_result(result),
+                        success=not (isinstance(decoded, dict) and bool(decoded.get("error"))),
                         latency_ms=latency_ms,
-                        error=safe_error(exc) if isinstance(exc, Exception) else "Call cancelled.",
                         client_id=client_id,
                     )
                     for authority, _controller, _site in operation.attempts:
-                        authority.complete(operation, "uncertain")
-                    raise
-
+                        authority.complete(
+                            operation,
+                            "error"
+                            if isinstance(decoded, dict) and decoded.get("error")
+                            else "success",
+                        )
+                    completion_recorded = True
+                    return result
+            except BaseException:
+                if not completion_recorded:
+                    authorities = {owner for owner, _controller, _site in operation.attempts}
+                    for authority in authorities:
+                        authority.healthy = False
+                    for authority in authorities:
+                        authority.completion_failed(operation)
+                raise
+            finally:
                 OPERATION.reset(operation_token)
                 _ANNOTATIONS.reset(annotations_token)
-                _apply_annotations()
-                latency_ms = (time.perf_counter() - start) * 1000.0
-                decoded = _coerce_result(result)
-                span.set(
-                    telemetry.ATTR_OUTCOME,
-                    telemetry.OUTCOME_ERROR
-                    if isinstance(decoded, dict) and decoded.get("error")
-                    else telemetry.OUTCOME_OK,
-                )
-                await log.emit(
-                    controller=controller,
-                    tool=tool_name,
-                    args=audit_args,
-                    result=_coerce_result(result),
-                    success=not (isinstance(decoded, dict) and bool(decoded.get("error"))),
-                    latency_ms=latency_ms,
-                    client_id=client_id,
-                )
-                for authority, _controller, _site in operation.attempts:
-                    authority.complete(
-                        operation,
-                        "error"
-                        if isinstance(decoded, dict) and decoded.get("error")
-                        else "success",
-                    )
-                return result
 
         return wrapper
 

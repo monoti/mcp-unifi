@@ -382,3 +382,131 @@ async def test_journal_directory_sync_failure_blocks_consumption(authority, monk
     assert not operation.attempts
     with closing(sqlite3.connect(authority.journal)) as connection:
         assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
+
+
+async def test_consumed_earlier_filename_does_not_shadow_fresh_grant(authority):
+    operation = Operation("alice", "create_vlan", {"name": "test"})
+    grant(authority, operation)
+    old_path = authority.grants / "000-old.json"
+    (authority.grants / "grant.json").rename(old_path)
+    token = OPERATION.set(operation)
+    try:
+        await authority.begin("home", "default")
+        authority.complete(operation, "success")
+    finally:
+        OPERATION.reset(token)
+    fresh = json.loads(old_path.read_text())
+    fresh["id"] = "fresh-grant"
+    path = authority.grants / "999-fresh.json"
+    path.write_text(json.dumps(fresh))
+    path.chmod(0o600)
+    restarted = Authority(
+        readonly=False, scopes=authority.scopes, grants=authority.grants, journal=authority.journal
+    )
+    token = OPERATION.set(Operation("alice", operation.tool, operation.arguments))
+    try:
+        await restarted.begin("home", "default")
+        restarted.complete(OPERATION.get(), "success")
+    finally:
+        OPERATION.reset(token)
+    with closing(sqlite3.connect(authority.journal)) as connection:
+        assert connection.execute(
+            "SELECT grant_id,outcome FROM attempts ORDER BY grant_id"
+        ).fetchall() == [("fresh-grant", "success"), ("grant-one", "success")]
+    token = OPERATION.set(Operation("alice", operation.tool, operation.arguments))
+    try:
+        with pytest.raises(UniFiError, match="already been consumed"):
+            await restarted.begin("home", "default")
+    finally:
+        OPERATION.reset(token)
+
+
+@pytest.mark.parametrize("body_raises", [False, True])
+@respx.mock
+async def test_cancelled_completion_blocks_readiness_and_later_requests(
+    authority, monkeypatch, body_raises
+):
+    from mcp_unifi import server as server_module
+    from mcp_unifi.modules import _audit
+
+    completion_entered = asyncio.Event()
+    context_after = []
+
+    class BlockedCompletionSink:
+        async def write(self, event):
+            if event.result != {"phase": "intent"}:
+                completion_entered.set()
+                await asyncio.Event().wait()
+
+        async def aclose(self):
+            pass
+
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+
+    @_audit.audited("completion_cancel_probe", mutates=True)
+    async def mutation():
+        await client.create_wlan({"name": "test"})
+        if body_raises:
+            raise RuntimeError("synthetic tool failure")
+        return {"created": True}
+
+    operation = Operation("alice", "completion_cancel_probe", {})
+    grant(authority, operation)
+    registry = build_registry(Settings(stub_mode=True))
+    registry.authority = authority
+    monkeypatch.setattr(server_module, "build_registry", lambda *args, **kwargs: registry)
+    server = build_server(Settings(stub_mode=True, readonly=False, auth_required=False))
+    audit.set_audit_log(audit.AuditLog(BlockedCompletionSink()))
+
+    async def invoke():
+        try:
+            await mutation()
+        finally:
+            context_after.append((OPERATION.get(), _audit._ANNOTATIONS.get()))
+
+    task = asyncio.create_task(invoke())
+    try:
+        await asyncio.wait_for(completion_entered.wait(), timeout=5)
+        assert route.call_count == 1
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, timeout=5)
+        assert context_after == [(None, None)]
+        assert authority.healthy is False
+        audit.set_audit_log(None)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(server.http_app()), base_url="http://test"
+        ) as http_client:
+            assert (await http_client.get("/ready")).status_code == 503
+        fresh = json.loads((authority.grants / "grant.json").read_text())
+        fresh["id"] = "fresh-grant"
+        (authority.grants / "grant.json").write_text(json.dumps(fresh))
+        with pytest.raises(UniFiError, match="unavailable"):
+            await mutation()
+        assert route.call_count == 1
+        with closing(sqlite3.connect(authority.journal)) as connection:
+            assert connection.execute("SELECT outcome FROM attempts").fetchall() == [("uncertain",)]
+    finally:
+        task.cancel()
+        await client.aclose()
+
+
+async def test_recorded_exception_outcome_keeps_authority_healthy(authority):
+    from mcp_unifi.modules._audit import audited
+
+    @audited("recorded_exception_probe", mutates=True)
+    async def mutation():
+        await authority.begin("home", "default")
+        raise RuntimeError("synthetic tool failure")
+
+    grant(authority, Operation("alice", "recorded_exception_probe", {}))
+    with pytest.raises(RuntimeError, match="synthetic tool failure"):
+        await mutation()
+    assert authority.healthy is True
+    assert OPERATION.get() is None
+    with closing(sqlite3.connect(authority.journal)) as connection:
+        assert connection.execute("SELECT outcome FROM attempts").fetchall() == [("uncertain",)]

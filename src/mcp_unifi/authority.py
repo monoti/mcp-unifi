@@ -188,11 +188,28 @@ class Authority:
         )
         if not audit.get_audit_log().healthy:
             raise UniFiError("Audit is unhealthy. No controller write was made.")
-        grant = matches[0]
-        if time.time() >= grant.expires:
+        if all(time.time() >= grant.expires for grant in matches):
             raise UniFiError("Operator grant expired before durable consumption.")
         try:
             with closing(self._connection()) as connection, connection:
+                connection.execute("BEGIN IMMEDIATE")
+                selected_grant = next(
+                    (
+                        candidate
+                        for candidate in matches
+                        if time.time() < candidate.expires
+                        and connection.execute(
+                            "SELECT 1 FROM attempts WHERE grant_id=?", (candidate.id,)
+                        ).fetchone()
+                        is None
+                    ),
+                    None,
+                )
+                if selected_grant is None:
+                    raise UniFiError("Operator grant has already been consumed or expired.")
+                grant = selected_grant
+                if time.time() >= grant.expires:
+                    raise UniFiError("Operator grant expired before durable consumption.")
                 connection.execute(
                     "INSERT INTO attempts VALUES (?, ?, ?, ?, ?)",
                     (
@@ -213,8 +230,6 @@ class Authority:
                         "pending",
                     ),
                 )
-        except sqlite3.IntegrityError as exc:
-            raise UniFiError("Operator grant has already been consumed.") from exc
         except (OSError, sqlite3.Error) as exc:
             self.healthy = False
             raise UniFiError(
@@ -241,6 +256,19 @@ class Authority:
                 raise UniFiError(
                     "Controller outcome is uncertain because audit completion failed."
                 ) from exc
+
+    def completion_failed(self, operation: Operation) -> None:
+        self.healthy = False
+        try:
+            with closing(self._connection()) as connection, connection:
+                for (owner, _controller, _site), grant_id in operation.attempts.items():
+                    if owner is self:
+                        connection.execute(
+                            "UPDATE attempts SET outcome='uncertain' WHERE grant_id=?", (grant_id,)
+                        )
+        except (OSError, sqlite3.Error, UniFiError):
+            # The committed pending intent still prevents replay if storage has failed.
+            pass
 
 
 @dataclass(frozen=True)
