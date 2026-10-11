@@ -16,7 +16,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
   publish:
+    needs: verify
     name: Build + Push image
     runs-on: ubuntu-latest
     steps:
@@ -109,10 +114,7 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          mkdir -p dist/dxt/bundle
-          python -m pip install --upgrade pip
-          pip install --target dist/dxt/bundle .
-          cp manifest.json dist/dxt/manifest.json
+          python scripts/build_dxt.py dist/dxt
           cd dist/dxt
           zip -r "../../mcp-unifi-${VERSION}.dxt" .
 

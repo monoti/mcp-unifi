@@ -18,8 +18,9 @@ def test_healthcheck_ok_on_200() -> None:
     resp.__enter__.return_value = resp
     resp.__exit__.return_value = False
 
-    with patch("urllib.request.urlopen", return_value=resp):
+    with patch("urllib.request.urlopen", return_value=resp) as request:
         assert check() == 0
+    assert request.call_args.args[0].endswith("/ready")
 
 
 def test_healthcheck_fails_on_non_200() -> None:

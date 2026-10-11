@@ -35,12 +35,13 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Build minimal wheels into /wheels so the runtime stage can install offline.
-COPY requirements.lock ./requirements.lock
+COPY requirements.lock requirements-build.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements-build.lock
 RUN pip install --no-cache-dir --require-hashes --target /wheels -r requirements.lock
 
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir --target /wheels --no-deps .
+RUN pip install --no-cache-dir --target /wheels --no-deps --no-build-isolation .
 
 # ---------------------------------------------------------------------------
 # Runtime stage: slim image with only the installed package + UID 1000 user.
@@ -75,7 +76,7 @@ RUN apt-get update && apt-get -y upgrade \
 # `name` field in server.json so the registry can verify the publisher
 # controls this image. See:
 # https://github.com/modelcontextprotocol/registry/blob/main/docs/modelcontextprotocol-io/package-types.mdx
-LABEL io.modelcontextprotocol.server.name="io.github.pete-builds/unifi"
+LABEL io.modelcontextprotocol.server.name="io.github.monoti/unifi"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -88,7 +89,9 @@ RUN groupadd --system --gid 1000 mcp \
 
 WORKDIR /app
 COPY --from=builder /wheels /app/site-packages
-RUN chown -R mcp:mcp /app
+RUN mkdir -p /var/lib/mcp-unifi \
+    && chown -R mcp:mcp /app /var/lib/mcp-unifi \
+    && chmod 0700 /var/lib/mcp-unifi
 
 # Runtime does not use pip: the wheels above are pre-installed and the entrypoint
 # runs `python -m mcp_unifi.server`. Removing pip drops its vendored dependencies

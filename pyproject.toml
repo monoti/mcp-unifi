@@ -63,10 +63,10 @@ mcp-unifi-pin-cert = "mcp_unifi.cli.pin_cert:main"
 mcp-unifi-approve = "mcp_unifi.cli.approve:main"
 
 [project.urls]
-Homepage = "https://github.com/pete-builds/mcp-unifi"
-Repository = "https://github.com/pete-builds/mcp-unifi"
-Issues = "https://github.com/pete-builds/mcp-unifi/issues"
-Changelog = "https://github.com/pete-builds/mcp-unifi/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/monoti/mcp-unifi"
+Repository = "https://github.com/monoti/mcp-unifi"
+Issues = "https://github.com/monoti/mcp-unifi/issues"
+Changelog = "https://github.com/monoti/mcp-unifi/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,106 +1,13 @@
-name: Publish to MCP Registry
-
-# Publishes server.json to the official Model Context Protocol Registry
-# (https://registry.modelcontextprotocol.io). Uses OIDC for authentication
-# so no secrets are needed beyond the default GITHUB_TOKEN.
-#
-# Triggers:
-#   - On v*.*.* tag push (after the Release workflow has built the image)
-#   - Manual via workflow_dispatch
+name: MCP Registry publication disabled
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
-  packages: read
-
-concurrency:
-  group: publish-mcp-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Publish server.json to MCP Registry
+  publication-disabled:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Verify server.json matches the tag
-        # release.yml's verify step already enforces this for tag builds, but
-        # this workflow can also run on workflow_dispatch against main. Re-run
-        # the tag check here so a stale server.json can never reach the
-        # registry.
-        if: github.ref_type == 'tag'
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          VERSION="${REF_NAME#v}"
-          server_version=$(python3 -c "import json;print(json.load(open('server.json'))['version'])")
-          server_oci=$(python3 -c "import json;print(json.load(open('server.json'))['packages'][0]['identifier'])")
-          expected_oci="ghcr.io/${REPO}:${VERSION}"
-          if [ "${server_version}" != "${VERSION}" ] || [ "${server_oci}" != "${expected_oci}" ]; then
-            echo "::error::server.json disagrees with tag ${REF_NAME}"
-            echo "::error::  version    got '${server_version}', expected '${VERSION}'"
-            echo "::error::  identifier got '${server_oci}', expected '${expected_oci}'"
-            exit 1
-          fi
-          echo "server.json matches tag ${REF_NAME}:"
-          grep -E '"version"|"identifier"' server.json
-
-      - name: Log in to GHCR
-        if: github.ref_type == 'tag'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Wait for the released image to land in GHCR
-        # The registry verifies ownership by reading the
-        # io.modelcontextprotocol.server.name label off the OCI image named in
-        # server.json, so that image has to exist first. Release.yml is triggered
-        # by the same tag push and takes ~10-15min for the multi-arch build, so
-        # poll rather than racing it.
-        if: github.ref_type == 'tag'
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          VERSION="${REF_NAME#v}"
-          IMAGE="ghcr.io/${REPO}:${VERSION}"
-          for i in $(seq 1 60); do
-            if docker manifest inspect "${IMAGE}" >/dev/null 2>&1; then
-              echo "${IMAGE} is live (attempt ${i})"
-              exit 0
-            fi
-            echo "attempt ${i}/60: ${IMAGE} not published yet, sleeping 30s"
-            sleep 30
-          done
-          echo "::error::timed out after 30min waiting for ${IMAGE}"
-          exit 1
-
-      - name: Install mcp-publisher
-        run: |
-          set -euo pipefail
-          OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_${OS}_${ARCH}.tar.gz" \
-            | tar xz mcp-publisher
-          ./mcp-publisher --help
-
-      - name: Authenticate (GitHub OIDC)
-        run: ./mcp-publisher login github-oidc
-
-      - name: Validate server.json
-        run: ./mcp-publisher validate
-
-      - name: Publish to MCP Registry
-        run: ./mcp-publisher publish
+      - run: echo "Configure fork registry ownership and a checksum-pinned publisher before enabling publication."
