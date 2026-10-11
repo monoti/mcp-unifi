@@ -305,6 +305,7 @@ async def probe(repo: Path, output: Path):
                     assert denied(refusal), "real mutation succeeded without operator grant"
                     assert not controller.mutations, "denied operation reached mock controller"
                     await approve(scratch, env, "alice", "block_client", arguments)
+                    next(grants.glob("*.json")).rename(grants / "00-consumed.json")
                     write = await client.call_tool("block_client", arguments, raise_on_error=False)
                     assert not denied(write), "exact granted mutation was refused"
                     assert len(controller.mutations) == 1, (
@@ -326,11 +327,21 @@ async def probe(repo: Path, output: Path):
                     replay = await client.call_tool("block_client", arguments, raise_on_error=False)
                     assert denied(replay), "approval replay succeeded after server restart"
                     assert len(controller.mutations) == 1
+                    await approve(scratch, env, "alice", "block_client", arguments)
+                    fresh = next(
+                        path for path in grants.glob("*.json") if path.name != "00-consumed.json"
+                    )
+                    fresh.rename(grants / "01-fresh.json")
+                    approved_again = await client.call_tool(
+                        "block_client", arguments, raise_on_error=False
+                    )
+                    assert not denied(approved_again), "consumed grant shadowed fresh approval"
+                    assert len(controller.mutations) == 2
             results["http"] = await check_http(scratch, env, config, cert, key, controller)
             with closing(sqlite3.connect(scratch / "mutations.sqlite3")) as journal:
                 outcomes = journal.execute("SELECT outcome FROM attempts").fetchall()
                 rows = len(outcomes)
-                assert rows == 3, "durable one-use records missing"
+                assert rows == 4, "durable one-use records missing"
                 assert all(row[0] == "success" for row in outcomes), "durable completion missing"
             events = [
                 json.loads(line) for line in (scratch / "audit.jsonl").read_text().splitlines()
@@ -348,6 +359,7 @@ async def probe(repo: Path, output: Path):
                     "externally_granted_mutations": len(controller.mutations),
                     "changed_arguments_denied": True,
                     "restart_replay_denied": True,
+                    "fresh_identical_approval_succeeded": True,
                     "durable_attempts": rows,
                 }
             )

@@ -45,7 +45,7 @@ mcp-unifi-approve --principal alice --controller home --tool block_client \
 
 The CLI prints the grant filename. It does not contact a controller. The default lifetime is five minutes and the maximum is one hour. Default arguments are normalized by the registered tool signature. The grant binds the identity, resolved controller, configured site, original tool, and complete arguments. Changing any bound value requires a new approval. A destructive preview token belongs to its issuer. Approval names the original destructive tool, such as `delete_wlan`, rather than `confirm_destructive_action`.
 
-A grant permits one top-level invocation, including its constituent requests and compensation. It is consumed durably before the first request and stays consumed across process restarts or uncertain outcomes. The SQLite row also stores the sanitized original intent as the durable prewrite audit record. The journal uses synchronous EXTRA, requests fullfsync on macOS, and syncs the parent directory after initialization. Audit preparation failure prevents execution. Completion persistence failure marks the authority unhealthy and blocks later writes. Inspect the journal and controller state before issuing a replacement grant after an uncertain outcome. Replay and rollback require their own approved original invocation.
+A grant permits one top-level invocation, including its constituent requests and compensation. It is consumed durably before the first request and stays consumed across process restarts or uncertain outcomes. The SQLite row also stores the sanitized original intent as the durable prewrite audit record. The journal uses synchronous EXTRA, requests fullfsync on macOS, and syncs the parent directory after initialization. Audit preparation failure prevents execution. Completion audit failure or cancellation marks the authority unhealthy and blocks later writes. The server attempts to persist an uncertain outcome without waiting on the failed sink again. Inspect the journal and controller state before issuing a replacement grant after an uncertain outcome. A fresh identical approval can be used even while older consumed grant files remain. Replay and rollback require their own approved original invocation.
 
 ## Filesystem ownership and deployment
 
@@ -59,7 +59,7 @@ The Helm chart uses `fsGroup` only for ephemeral read-only storage. Persistent c
 
 ## Packaging and migration
 
-All enabled release publication channels wait for tests, lint, strict types, and filesystem/image scans of the exact triggering revision. Registry publication is disabled until fork credentials and ownership are configured. No fork release has been published by this task.
+All enabled release publication channels wait for tests, lint, strict types, and filesystem/image scans of the exact triggering revision. The release job scans the assembled DXT bundle for high and critical vulnerabilities and secrets before archiving and attaching those files. Registry publication is disabled until fork credentials and ownership are configured. No fork release has been published by this task.
 
 Build a DXT from this checkout with `python scripts/build_dxt.py /new/bundle`. The builder installs hash-locked build and runtime dependencies, then installs the project with `--no-deps --no-build-isolation`. It verifies bundle imports, version metadata, and entry points. Each generated bundle supports the build host's platform because dependencies contain native wheels. Python must already be installed on the target host.
 
