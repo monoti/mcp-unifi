@@ -146,6 +146,28 @@ async def test_failed_audit_prevents_consumption_and_request(authority):
     assert not authority.journal.exists()
 
 
+async def test_grant_expiring_during_audit_cannot_be_consumed(authority, monkeypatch):
+    expiry = time.time() + 300
+
+    class DelayedSink:
+        async def write(self, event):
+            monkeypatch.setattr(time, "time", lambda: expiry + 1)
+
+        async def aclose(self):
+            pass
+
+    operation = Operation("alice", "create_vlan", {"name": "test"})
+    grant(authority, operation, expiry=expiry)
+    audit.set_audit_log(audit.AuditLog(DelayedSink()))
+    token = OPERATION.set(operation)
+    try:
+        with pytest.raises(UniFiError, match="expired before"):
+            await authority.begin("home", "default")
+    finally:
+        OPERATION.reset(token)
+    assert not authority.journal.exists()
+
+
 async def test_confirmation_is_bound_to_issuer(monkeypatch):
     settings = Settings(stub_mode=True, readonly=False, auth_required=False)
     state = StubState()

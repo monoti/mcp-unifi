@@ -181,6 +181,8 @@ class Authority:
         if not audit.get_audit_log().healthy:
             raise UniFiError("Audit is unhealthy. No controller write was made.")
         grant = matches[0]
+        if time.time() >= grant.expires:
+            raise UniFiError("Operator grant expired before durable consumption.")
         try:
             with closing(self._connection()) as connection, connection:
                 connection.execute(
