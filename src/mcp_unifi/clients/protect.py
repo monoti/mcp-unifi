@@ -23,9 +23,9 @@ from typing import Any, Literal
 
 import httpx
 
+from mcp_unifi.clients.errors import DiagnosticError
 from mcp_unifi.clients.ids import path_segment
 from mcp_unifi.clients.retry import request_with_retry
-from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.models import UniFiRecord
 
 logger = logging.getLogger("mcp_unifi.protect_client")
@@ -99,11 +99,11 @@ class ProtectClient:
             url,
             logger=logger,
             service="Protect",
-            error_cls=UniFiError,
+            error_cls=DiagnosticError,
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(f"Protect {method} {path} returned {resp.status_code}")
+            raise DiagnosticError(f"Protect {method} {path} returned {resp.status_code}")
         if not resp.content:
             return None
         return resp.json()
@@ -120,10 +120,10 @@ class ProtectClient:
             url,
             logger=logger,
             service="Protect",
-            error_cls=UniFiError,
+            error_cls=DiagnosticError,
         )
         if resp.status_code >= 400:
-            raise UniFiError(f"Protect {method} {path} returned {resp.status_code}")
+            raise DiagnosticError(f"Protect {method} {path} returned {resp.status_code}")
         return resp.content
 
     @staticmethod
@@ -144,7 +144,7 @@ class ProtectClient:
 
     def _require_internal(self, operation: str) -> None:
         if self.api_mode == "integration":
-            raise UniFiError(
+            raise DiagnosticError(
                 f"Protect {operation} is unavailable on the Integration API v1. "
                 "Use protect_api='internal' only if the console accepts that API."
             )

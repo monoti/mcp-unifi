@@ -128,7 +128,7 @@ class FileSink:
 
     def __init__(self, path: str | os.PathLike[str]) -> None:
         self._path = Path(path)
-        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
 
     @property
     def path(self) -> Path:
@@ -143,7 +143,13 @@ class FileSink:
         await asyncio.to_thread(self._append, line)
 
     def _append(self, line: str) -> None:
-        with self._path.open("a", encoding="utf-8") as fh:
+        descriptor = os.open(
+            self._path, os.O_APPEND | os.O_CREAT | os.O_WRONLY | os.O_NOFOLLOW, 0o600
+        )
+        if os.fstat(descriptor).st_mode & 0o077:
+            os.close(descriptor)
+            raise PermissionError("Audit file requires owner-only permissions.")
+        with os.fdopen(descriptor, "a", encoding="utf-8") as fh:
             fh.write(line)
             fh.flush()
             os.fsync(fh.fileno())
@@ -221,6 +227,7 @@ class AuditLog:
     def __init__(self, sink: Sink) -> None:
         self._sink = sink
         self._lock = asyncio.Lock()
+        self.healthy = True
 
     @property
     def sink(self) -> Sink:
@@ -256,7 +263,13 @@ class AuditLog:
             result=scrub(result),
             success=success,
             latency_ms=round(latency_ms, 3),
-            error=error,
+            error=(
+                f"Call refused by {denied_by} policy."
+                if error is not None and denied_by in {"readonly", "scope"}
+                else "Operation failed."
+                if error is not None
+                else None
+            ),
             client_id=client_id,
             denied_by=denied_by,
         )
@@ -264,6 +277,7 @@ class AuditLog:
             try:
                 await self._sink.write(event)
             except Exception:  # pragma: no cover - defensive only
+                self.healthy = False
                 logger.exception(
                     "audit sink write failed",
                     extra={"controller": controller, "tool": tool},

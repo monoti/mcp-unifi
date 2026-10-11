@@ -26,6 +26,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_unifi.annotations import DESTRUCTIVE_ONCE
+from mcp_unifi.authority import OPERATION, principal
 from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.modules._audit import annotate_audit, audited
@@ -74,16 +75,28 @@ def register(mcp: FastMCP, settings: Settings, _registry: ControllerRegistry) ->
             for unknown, used, or expired tokens.
         """
         annotate_audit(preview_id=preview_id(token))
-        pending = get_pending_actions().pop(token)
+        pending = get_pending_actions().get(token)
         if pending is None:
             return err(
                 "unknown or expired token. Tokens are single-use and "
                 "expire 5 minutes after issuance; re-invoke the original "
                 "destructive tool to get a fresh token."
             )
+        if pending.issuer != principal():
+            return err("Confirmation belongs to another caller.")
+        if _registry.authority is not None:
+            _registry.authority.check_scope(_registry.resolve_name(pending.controller))
+        get_pending_actions().pop(token)
         annotate_audit(controller=pending.controller, action=pending.action)
         try:
-            return await pending.executor()
+            confirmation = OPERATION.get()
+            context_token = OPERATION.set(pending.intent)
+            try:
+                return await pending.executor()
+            finally:
+                OPERATION.reset(context_token)
+                if confirmation is not None and pending.intent is not None:
+                    confirmation.attempts.update(pending.intent.attempts)
         except UniFiError as exc:
             logger.exception(
                 "confirm_destructive_action failed",

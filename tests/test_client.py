@@ -14,6 +14,8 @@ BASE = "https://gateway.test:443/proxy/network/api/s/default"
 @pytest.fixture
 async def client() -> UniFiClient:
     c = UniFiClient(host="gateway.test", api_key="test-key", verify_ssl=False)
+    c._client._transport = httpx.MockTransport(respx.mock.async_handler)
+    c._client._mounts.clear()
     yield c
     await c.aclose()
 

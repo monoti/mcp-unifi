@@ -307,6 +307,19 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Read-only write gate (v0.21.0+)
     # ------------------------------------------------------------------
+    controller_scopes: dict[str, list[str]] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices("MCP_UNIFI_CONTROLLER_SCOPES", "controller_scopes"),
+        description="Trusted caller IDs mapped to allowed resolved controller names.",
+    )
+    approval_dir: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MCP_UNIFI_APPROVAL_DIR", "approval_dir"),
+    )
+    mutation_journal: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MCP_UNIFI_MUTATION_JOURNAL", "mutation_journal"),
+    )
     readonly: bool = Field(
         default=True,
         validation_alias=AliasChoices("MCP_UNIFI_READONLY", "readonly"),

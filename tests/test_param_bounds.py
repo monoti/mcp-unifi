@@ -33,7 +33,11 @@ EXPECTED_BOUNDS: dict[tuple[str, str], int] = {
 
 async def _tool_schemas() -> dict[str, dict]:
     settings = Settings(
-        stub_mode=True, log_format="text", mcp_transport="stdio", auth_required=False
+        readonly=False,
+        stub_mode=True,
+        log_format="text",
+        mcp_transport="stdio",
+        auth_required=False,
     )
     server = build_server(settings)
     tools = await server.list_tools()

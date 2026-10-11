@@ -18,6 +18,7 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, overload
 
+from mcp_unifi.authority import CLIENTS, Authority, Target, principal
 from mcp_unifi.backends import (
     AccessBackend,
     AccessRealBackend,
@@ -31,10 +32,11 @@ from mcp_unifi.backends import (
 )
 from mcp_unifi.clients.access import AccessClient
 from mcp_unifi.clients.access_stubs import make_access_stub_state
+from mcp_unifi.clients.errors import DiagnosticError
 from mcp_unifi.clients.protect import ProtectClient
 from mcp_unifi.clients.protect_stubs import make_protect_stub_state
 from mcp_unifi.clients.stubs import make_stub_state
-from mcp_unifi.clients.unifi import UniFiClient, UniFiError
+from mcp_unifi.clients.unifi import UniFiClient
 from mcp_unifi.modules._audit import tool_mutates
 from mcp_unifi.scoping import MUTATING_TAG
 
@@ -118,6 +120,7 @@ class ControllerRegistry:
         protect_backends: dict[str, ProtectBackend] | None = None,
         access_backends: dict[str, AccessBackend] | None = None,
         default_name: str | None = None,
+        authority: Authority | None = None,
     ) -> None:
         if not backends:
             raise ValueError("ControllerRegistry requires at least one backend.")
@@ -125,6 +128,7 @@ class ControllerRegistry:
             raise ValueError(
                 f"default_name '{default_name}' is not a registered controller: {sorted(backends)}"
             )
+        self.authority = authority
         self._backends = dict(backends)
         self._default_name = default_name
         self._protect_backends: dict[str, ProtectBackend] = (
@@ -157,7 +161,7 @@ class ControllerRegistry:
         """
         if name in self._backends:
             return name
-        available = ", ".join(sorted(self._backends)) or "(none)"
+        available = ", ".join(self.names()) or "(none)"
         if name == DEFAULT_CONTROLLER_ALIAS:
             if self._default_name is not None:
                 return self._default_name
@@ -171,7 +175,10 @@ class ControllerRegistry:
         raise UnknownControllerError(f"Unknown controller '{name}'. Available: {available}.")
 
     def get(self, name: str) -> Backend:
-        return self._backends[self.resolve_name(name)]
+        resolved = self.resolve_name(name)
+        if self.authority is not None:
+            self.authority.check_scope(resolved)
+        return self._backends[resolved]
 
     def get_protect(self, name: str) -> ProtectBackend:
         """Return the Protect backend registered for ``name``.
@@ -190,9 +197,15 @@ class ControllerRegistry:
                 "Enable the 'protect' module via MCP_UNIFI_MODULES_ENABLED."
             )
         try:
-            return self._protect_backends[self.resolve_name(name)]
+            resolved = self.resolve_name(name)
+            if self.authority is not None:
+                self.authority.check_scope(resolved)
+            return self._protect_backends[resolved]
         except KeyError as exc:
-            available = ", ".join(sorted(self._protect_backends)) or "(none)"
+            available = (
+                ", ".join(name for name in self.names() if name in self._protect_backends)
+                or "(none)"
+            )
             raise UnknownControllerError(
                 f"Unknown controller '{name}'. Available (Protect): {available}."
             ) from exc
@@ -215,15 +228,27 @@ class ControllerRegistry:
                 "access_* fields in the controllers YAML)."
             )
         try:
-            return self._access_backends[self.resolve_name(name)]
+            resolved = self.resolve_name(name)
+            if self.authority is not None:
+                self.authority.check_scope(resolved)
+            return self._access_backends[resolved]
         except KeyError as exc:
-            available = ", ".join(sorted(self._access_backends)) or "(none)"
+            available = (
+                ", ".join(name for name in self.names() if name in self._access_backends)
+                or "(none)"
+            )
             raise UnknownControllerError(
                 f"Unknown controller '{name}'. Available (Access): {available}."
             ) from exc
 
     def names(self) -> list[str]:
-        return sorted(self._backends)
+        return sorted(
+            name
+            for name in self._backends
+            if self.authority is None
+            or not self.authority.scopes
+            or name in self.authority.scopes.get(principal() or "", [])
+        )
 
     def __len__(self) -> int:
         return len(self._backends)
@@ -283,6 +308,16 @@ def build_registry(
         access_stub_overrides if settings.stub_mode else access_real_overrides
     ) or {}
 
+    authority = Authority(
+        readonly=settings.readonly,
+        scopes=settings.controller_scopes,
+        grants=settings.approval_dir,
+        journal=settings.mutation_journal,
+    )
+    unknown = {name for names in settings.controller_scopes.values() for name in names}
+    unknown -= {controller.name for controller in settings.controllers}
+    if unknown:
+        raise ValueError("Controller scopes contain unknown controller names.")
     for ctrl in settings.controllers:
         if ctrl.name in overrides:
             backends[ctrl.name] = overrides[ctrl.name]
@@ -329,11 +364,21 @@ def build_registry(
             )
             access_backends[ctrl.name] = AccessRealBackend(access_client)
 
+        for backend in (
+            backends.get(ctrl.name),
+            protect_backends.get(ctrl.name),
+            access_backends.get(ctrl.name),
+        ):
+            registered_client = getattr(backend, "client", None)
+            if registered_client is not None:
+                CLIENTS[registered_client._client] = Target(authority, ctrl.name, ctrl.site)
+
     return ControllerRegistry(
         backends,
         protect_backends=protect_backends,
         access_backends=access_backends,
         default_name=settings.default_controller or None,
+        authority=authority,
     )
 
 
@@ -387,7 +432,7 @@ def resolve_backend(
         AccessNotAvailableError,
         UnknownControllerError,
     ) as exc:
-        raise UniFiError(str(exc)) from exc
+        raise DiagnosticError(str(exc)) from exc
 
 
 def _enabled_modules() -> tuple[str, ...]:

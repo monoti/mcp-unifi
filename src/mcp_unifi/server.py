@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import closing
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
@@ -32,7 +33,8 @@ from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from mcp_unifi import __version__, telemetry
+from mcp_unifi import __version__, audit, telemetry
+from mcp_unifi.authority import secure_path
 from mcp_unifi.backends import (
     AccessBackend,
     AccessRealBackend,
@@ -161,6 +163,27 @@ def build_server(
         200 status code, not the body, so the JSON shape is safe.
         """
         return JSONResponse({"status": "ok", "version": _resolve_version()})
+
+    @mcp.custom_route("/ready", methods=["GET"])
+    async def ready(_request: Request) -> JSONResponse:
+        log = audit.get_audit_log()
+        await log.emit("local", "readiness", {}, None, True, 0)
+        authority = registry.authority
+        healthy = log.healthy and authority is not None and authority.healthy
+        if healthy and not settings.stub_mode and not settings.readonly:
+            try:
+                if authority is None or authority.grants is None or not authority.scopes:
+                    healthy = False
+                else:
+                    secure_path(authority.grants, directory=True)
+                    with closing(authority._connection()):
+                        pass
+            except Exception:
+                healthy = False
+        return JSONResponse(
+            {"status": "ready" if healthy else "unavailable", "version": _resolve_version()},
+            status_code=200 if healthy else 503,
+        )
 
     register_modules(mcp, settings, registry)
     _install_scope_middleware(mcp, settings)

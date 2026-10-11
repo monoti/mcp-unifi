@@ -341,10 +341,12 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
     err = make_err(settings)
 
     def _controller_config(name: str) -> ControllerConfig:
+        registry.get(name)
+        name = registry.resolve_name(name)
         for ctrl in settings.controllers:
             if ctrl.name == name:
                 return ctrl
-        available = ", ".join(sorted(c.name for c in settings.controllers)) or "(none)"
+        available = ", ".join(registry.names()) or "(none)"
         raise KeyError(f"Unknown controller '{name}'. Available: {available}.")
 
     def _client(name: str) -> UniFiOSClient:
@@ -404,6 +406,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             controller: Name of the UniFi controller to target. Defaults to
                 ``"default"``.
         """
+        registry.get(controller)
         if settings.stub_mode:
             return format_json(_stub_health())
         try:
@@ -463,6 +466,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             controller: Name of the UniFi controller to target. Defaults to
                 ``"default"``.
         """
+        registry.get(controller)
         if settings.stub_mode:
             return format_json(
                 {
@@ -554,6 +558,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             controller: Name of the UniFi controller to target. Defaults to
                 ``"default"``.
         """
+        registry.get(controller)
         if settings.stub_mode:
             return format_json({"firmware": {"version": "5.1.19"}, "stub_mode": True})
         try:

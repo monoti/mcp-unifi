@@ -24,9 +24,9 @@ from typing import Any
 
 import httpx
 
+from mcp_unifi.clients.errors import DiagnosticError
 from mcp_unifi.clients.ids import path_segment
 from mcp_unifi.clients.retry import request_with_retry
-from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.models import UniFiRecord
 
 logger = logging.getLogger("mcp_unifi.access_client")
@@ -93,11 +93,11 @@ class AccessClient:
             url,
             logger=logger,
             service="Access",
-            error_cls=UniFiError,
+            error_cls=DiagnosticError,
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(f"Access {method} {path} returned {resp.status_code}")
+            raise DiagnosticError(f"Access {method} {path} returned {resp.status_code}")
         if not resp.content:
             return None
         return resp.json()

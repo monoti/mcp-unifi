@@ -13,7 +13,11 @@ class UniFiError(RuntimeError):
     """Raised on any non-2xx response or transport failure."""
 
 
-class UniFiUnsupportedError(UniFiError):
+class DiagnosticError(UniFiError):
+    """An internally constructed diagnostic without external response prose."""
+
+
+class UniFiUnsupportedError(DiagnosticError):
     """Raised when the controller firmware does not expose the requested route.
 
     Distinct from a generic :class:`UniFiError` so callers can tell "this
@@ -28,6 +32,6 @@ __all__ = ["UniFiError", "UniFiUnsupportedError"]
 
 def safe_error(exc: Exception) -> str:
     """Return controlled diagnostics without external exception messages."""
-    if isinstance(exc, UniFiError):
+    if isinstance(exc, DiagnosticError):
         return str(exc)
     return f"Operation failed ({type(exc).__name__})."

@@ -75,6 +75,28 @@ def _scrub(value: Any) -> Any:
     return redact(value)
 
 
+def safe_message(record: logging.LogRecord) -> str:
+    def sanitize(value: Any) -> Any:
+        if isinstance(value, BaseException):
+            return type(value).__name__
+        if isinstance(value, str):
+            try:
+                return json.dumps(redact(json.loads(value)))
+            except (ValueError, TypeError):
+                return value
+        return redact(value)
+
+    message = str(sanitize(record.msg))
+    if record.args:
+        arguments = (
+            tuple(sanitize(value) for value in record.args)
+            if isinstance(record.args, tuple)
+            else sanitize(record.args)
+        )
+        message = message % arguments
+    return message
+
+
 class JsonFormatter(logging.Formatter):
     """Serialise each log record as a single JSON line."""
 
@@ -83,7 +105,7 @@ class JsonFormatter(logging.Formatter):
             "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "msg": record.msg if record.exc_info else record.getMessage(),
+            "msg": "operation failed" if record.exc_info else safe_message(record),
         }
         if record.exc_info:
             payload["exc_info"] = record.exc_info[0].__name__ if record.exc_info[0] else "Exception"
@@ -103,7 +125,7 @@ class SafeTextFormatter(logging.Formatter):
         if record.exc_info:
             error_type = record.exc_info[0].__name__ if record.exc_info[0] else "Exception"
             return f"{record.levelname} {record.name}: operation failed ({error_type})"
-        return super().format(record)
+        return f"{record.levelname} {record.name}: {safe_message(record)}"
 
 
 def configure_logging(level: str = "INFO", fmt: str = "json") -> None:

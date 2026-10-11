@@ -143,6 +143,7 @@ async def test_legacy_single_controller_env_still_works(
 
 def _settings(*names: str, default_controller: str = "") -> Settings:
     return Settings(
+        readonly=False,
         stub_mode=True,
         log_format="text",
         auth_required=False,

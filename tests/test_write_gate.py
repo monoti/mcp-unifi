@@ -402,7 +402,7 @@ async def test_refused_call_writes_an_audit_event(
     assert ev["denied_by"] == DENIED_BY_READONLY
     assert ev["success"] is False
     assert ev["result"] is None
-    assert "read-only mode" in (ev["error"] or "")
+    assert "readonly policy" in (ev["error"] or "")
     assert ev["ts"].endswith("Z")
     assert "client_id" in ev  # None on stdio, but the field must be present
 

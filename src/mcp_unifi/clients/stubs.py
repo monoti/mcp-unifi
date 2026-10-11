@@ -20,7 +20,7 @@ import uuid
 from collections import defaultdict, deque
 from typing import Any
 
-from mcp_unifi.clients.errors import UniFiError
+from mcp_unifi.clients.errors import DiagnosticError
 from mcp_unifi.models import UniFiRecord
 
 
@@ -1231,7 +1231,7 @@ class StubState:
         # which hid that restore_config and provision_homelab_service could
         # not recreate a reservation for a known client on real hardware.
         if self.find_user_by_mac(str(payload.get("mac", ""))) is not None:
-            raise UniFiError("UniFi API error 400: api.err.MacUsed")
+            raise DiagnosticError("UniFi API error 400: api.err.MacUsed")
         record: UniFiRecord = {"_id": _oid(), "use_fixedip": True, **payload}
         self.dhcp_leases.append(record)
         return record

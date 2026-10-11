@@ -70,6 +70,7 @@ def _live_idle_timeout(tmp_path: Path, **extra_env: str) -> object:
     env.update(
         {
             "MCP_UNIFI_AUTH_REQUIRED": "false",
+            "MCP_TRANSPORT": "streamable-http",
             "MCP_UNIFI_AUDIT_PATH": str(tmp_path / "audit.jsonl"),
             "FASTMCP_CHECK_FOR_UPDATES": "off",
             "FASTMCP_SHOW_SERVER_BANNER": "false",

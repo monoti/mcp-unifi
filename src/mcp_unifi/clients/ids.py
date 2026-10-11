@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 
-from mcp_unifi.clients.errors import UniFiError
+from mcp_unifi.clients.errors import DiagnosticError
 
 #: Characters a single path segment may contain. Anchored with ``\A``/``\Z``
 #: rather than ``^``/``$``: Python's ``$`` also matches just before a trailing
@@ -42,7 +42,7 @@ _SEGMENT = re.compile(r"\A[A-Za-z0-9_.:-]+\Z")
 MAX_SEGMENT_LENGTH = 128
 
 
-class InvalidIdentifierError(UniFiError):
+class InvalidIdentifierError(DiagnosticError):
     """A caller-supplied id is not a single, safe URL path segment."""
 
 

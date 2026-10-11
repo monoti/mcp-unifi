@@ -90,6 +90,9 @@ async def request_with_retry(
             logger=logger, service="UniFi", error_cls=UniFiError,
         )
     """
+    from mcp_unifi.authority import before_request
+
+    await before_request(client, method, url)
     connect_retried = False
     fivexx_attempt = 0
     while True:

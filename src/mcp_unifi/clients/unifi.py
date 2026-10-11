@@ -16,7 +16,7 @@ from typing import Any
 
 import httpx
 
-from mcp_unifi.clients.errors import UniFiError, UniFiUnsupportedError
+from mcp_unifi.clients.errors import DiagnosticError, UniFiError, UniFiUnsupportedError
 from mcp_unifi.clients.ids import path_segment
 from mcp_unifi.clients.retry import request_with_retry
 from mcp_unifi.models import UniFiRecord
@@ -32,8 +32,11 @@ def _describe_error_body(resp: httpx.Response) -> str:
         payload = None
     if isinstance(payload, dict):
         meta = payload.get("meta")
-        if isinstance(meta, dict) and meta.get("msg") == "api.err.NoSiteContext":
-            return ": api.err.NoSiteContext"
+        if isinstance(meta, dict) and meta.get("msg") in {
+            "api.err.NoSiteContext",
+            "api.err.MacUsed",
+        }:
+            return f": {meta['msg']}"
     if resp.headers.get("content-type", "").split(";")[0] == "text/html":
         return f" (non-JSON body: text/html, {len(resp.content)} bytes)"
     return ""
@@ -97,11 +100,13 @@ class UniFiClient:
             url,
             logger=logger,
             service="UniFi",
-            error_cls=UniFiError,
+            error_cls=DiagnosticError,
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(f"UniFi {method} {path} returned {resp.status_code}")
+            raise DiagnosticError(
+                f"UniFi {method} {path} returned {resp.status_code}{_describe_error_body(resp)}"
+            )
         if not resp.content:
             return None
         body = resp.json()
@@ -136,11 +141,11 @@ class UniFiClient:
             url,
             logger=logger,
             service="UniFi v2",
-            error_cls=UniFiError,
+            error_cls=DiagnosticError,
             json=json,
         )
         if resp.status_code >= 400:
-            raise UniFiError(f"UniFi {method} (v2) {path} returned {resp.status_code}")
+            raise DiagnosticError(f"UniFi {method} (v2) {path} returned {resp.status_code}")
         if not resp.content:
             return None
         return resp.json()
@@ -312,10 +317,10 @@ class UniFiClient:
             url,
             logger=logger,
             service="UniFi",
-            error_cls=UniFiError,
+            error_cls=DiagnosticError,
         )
         if resp.status_code >= 400:
-            raise UniFiError(
+            raise DiagnosticError(
                 f"UniFi GET apgroups returned {resp.status_code}{_describe_error_body(resp)}"
             )
         if not resp.content:

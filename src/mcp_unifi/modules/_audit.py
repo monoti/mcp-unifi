@@ -1,75 +1,14 @@
-"""Audit decorator and write-classification for MCP tool functions.
+"""Tool classification, trusted effective intent, audit and outcome recording.
 
-Step 4 wires every tool through a small ``@audited("<tool_name>", mutates=...)``
-wrapper so every invocation emits one :class:`mcp_unifi.audit.AuditEvent` to the
-configured sink. The decorator deliberately lives at the **tool layer** (not the
-backend method layer) so the captured envelope reflects user-facing tool intent:
-the original kwargs, the original tool name, the controller the caller asked for.
-
-Read/write classification (v0.21)
----------------------------------
-``mutates`` is a **required** keyword argument. It declares whether the tool
-changes state anywhere outside this process — controller configuration, device
-state, or controller-side work. :class:`mcp_unifi.scoping.WriteGateMiddleware`
-uses it to enforce ``MCP_UNIFI_READONLY``.
-
-Why here, and why required:
-
-* It is declared at the registration site, next to the tool body and its
-  ``Side effects:`` docstring, so a reviewer classifies and implements in the
-  same diff.
-* Being required makes the gate fail closed at *import* time. Adding a tool
-  without classifying it raises ``TypeError`` and the server refuses to boot —
-  there is no default that silently leaves a new mutating tool callable while
-  ``MCP_UNIFI_READONLY=true``.
-* It reuses the decorator every tool already carries rather than adding a
-  parallel mechanism.
-
-Classification is recorded in a process-level registry keyed by tool name
-(:func:`tool_mutates`) rather than as an attribute on the wrapped function:
-FastMCP re-wraps tool callables during registration, so an attribute set here
-is not guaranteed to survive onto ``Tool.fn``. The registry is the value the
-dispatcher reads when it tags tools, and it is what the completeness test in
-``tests/test_write_gate.py`` enumerates.
-
-Design notes
-------------
-* Tool bodies are ``async def`` and return JSON strings (the payload Claude
-  sees). For audit we parse that string back into a structured object so the
-  audit log carries dicts, not stringified JSON. If parsing fails (a tool
-  returned a non-JSON sentinel for some reason) we fall back to the raw string.
-* Args are scrubbed by :func:`mcp_unifi.audit.AuditLog.emit` before they hit
-  the sink — sensitive keys (``passphrase``, ``api_key``, ``password``,
-  ``secret``, ``token``, etc.) become ``"***"``. We do not pre-scrub here; one
-  redaction pass keeps the contract in one place.
-* On exception the decorator records ``success=False`` with ``error=safe_error(exc)``
-  and re-raises. The audit emit itself never blocks the exception path —
-  sink errors are caught and logged inside :class:`AuditLog.emit`.
-* Latency is wall-clock milliseconds measured around the wrapped coroutine.
-
-Tracing (optional, v0.22)
--------------------------
-The same wrapper opens one OpenTelemetry span per call via
-:func:`mcp_unifi.telemetry.tool_span`. This is the right seam for it: it
-already knows the tool name, the declared ``mutates`` flag, the resolved
-controller, and the caller's kwargs (so it can read ``dry_run``), and it
-already sits on both the success and the exception path.
-
-Tracing is off by default and OpenTelemetry is not a runtime dependency; when
-it is absent the span object is a no-op and this wrapper behaves exactly as it
-did before. Arguments and results are **not** put on the span. See
-:mod:`mcp_unifi.telemetry` for why.
-
-The span's ``mcp.tool.outcome`` attribute uses the same semantics as the audit
-log's ``success`` field: ``"ok"`` means the tool body returned, which includes
-returning a formatted error envelope because the controller rejected the
-request. That asymmetry is deliberate in the audit log and is preserved here so
-the two records agree line for line. A trace that shows ``outcome=ok`` is
-saying "the server did its job", not "the change was applied".
+Real mutations cross the request guard in authority.py. This decorator captures
+validated arguments with defaults before execution and records whether the
+returned result succeeded. Failed persistence blocks later mutations.
 """
 
 from __future__ import annotations
 
+import copy
+import inspect
 import json
 import time
 from collections.abc import Awaitable, Callable
@@ -78,6 +17,7 @@ from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
 from mcp_unifi import audit, telemetry
+from mcp_unifi.authority import OPERATION, Operation, principal
 from mcp_unifi.clients.errors import safe_error
 
 P = ParamSpec("P")
@@ -206,6 +146,10 @@ def audited(
             # dispatch. Defensive: if any positional args slip through, capture
             # them under a synthetic key so they aren't silently dropped from
             # the audit envelope.
+            bound = inspect.signature(fn).bind(*args, **kwargs)
+            bound.apply_defaults()
+            operation = Operation(principal(), tool_name, copy.deepcopy(dict(bound.arguments)))
+            operation_token = OPERATION.set(operation)
             audit_args: dict[str, Any] = dict(kwargs)
             if args:
                 audit_args["_positional"] = list(args)
@@ -235,7 +179,8 @@ def audited(
                 start = time.perf_counter()
                 try:
                     result = await fn(*args, **kwargs)
-                except Exception as exc:
+                except BaseException as exc:
+                    OPERATION.reset(operation_token)
                     _ANNOTATIONS.reset(annotations_token)
                     _apply_annotations()
                     latency_ms = (time.perf_counter() - start) * 1000.0
@@ -247,11 +192,14 @@ def audited(
                         result=None,
                         success=False,
                         latency_ms=latency_ms,
-                        error=safe_error(exc),
+                        error=safe_error(exc) if isinstance(exc, Exception) else "Call cancelled.",
                         client_id=client_id,
                     )
+                    for authority, _controller, _site in operation.attempts:
+                        authority.complete(operation, "uncertain")
                     raise
 
+                OPERATION.reset(operation_token)
                 _ANNOTATIONS.reset(annotations_token)
                 _apply_annotations()
                 latency_ms = (time.perf_counter() - start) * 1000.0
@@ -271,6 +219,13 @@ def audited(
                     latency_ms=latency_ms,
                     client_id=client_id,
                 )
+                for authority, _controller, _site in operation.attempts:
+                    authority.complete(
+                        operation,
+                        "error"
+                        if isinstance(decoded, dict) and decoded.get("error")
+                        else "success",
+                    )
                 return result
 
         return wrapper
