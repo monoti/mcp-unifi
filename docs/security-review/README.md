@@ -8,9 +8,9 @@ The design comparison selected the request guard immediately before backend I/O.
 
 Journal recovery adds version 2 approvals bound to an explicitly initialized generation. Server and issuer opens never recreate missing storage. Each continuation checks the live journal, and completion requires exactly one pending row. Read [the selected approval design](history/selected-design.md) and [the journal recovery design](history/journal-selected-design.md) for the contracts and rejected alternatives.
 
-## Final verified checkpoint
+## Original verified checkpoint
 
-[The revision record](verified-revision.json) names the reviewed and tested source commit. Later publication changes contain evidence and documentation only. They do not change the runtime, test, build, workflow, or deployment trees.
+[The revision record](verified-revision.json) names the source commit for the results below. Follow-up changes standardize the local image name as `mcp-unifi`, keep audit artifacts local, restore environment guidance, and refresh dependency locks. Rerun the checks with the current locks before reusing these results for a newer revision.
 
 | Check | Observed result | Evidence |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ Ruff, mypy on 67 source files, actionlint, and the 160-page docs build also pass
 
 The final independent reviewers reported no new implementation findings. Read [Sol's final review](history/security-review-sol-r5.md), [Luna's final review](history/security-review-luna-r5.md), [Terra's final review](history/security-review-terra-r5.md), and [the parent triage](history/security-triage-r5.md). All prior reviews, accepted findings, responses, and selected design alternatives remain in [the history directory](history/).
 
-[The decision trail](decisions.tsv) preserves failed checks and later corrections. The two raw failing-test logs retain pytest whitespace. The full source whitespace check passes with exactly those two evidence files excluded. The initial failed review dispatches supplied no verdict. The earlier failed scanner download supplied no scan result; successful later scans close that check.
+[The decision trail](decisions.tsv) preserves failed checks and later corrections at the original checkpoint. Its two raw failing-test logs remain in the local audit directory with their original pytest whitespace. Audit artifacts are ignored and excluded from the current Git tree. The initial failed review dispatches supplied no verdict. The earlier failed scanner download supplied no scan result; successful later scans close that check.
 
 The complete private working record remains in the local homelab audit directory. Private transcripts and credentials are excluded from this publication.
 

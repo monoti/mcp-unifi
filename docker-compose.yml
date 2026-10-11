@@ -6,7 +6,7 @@ x-logging: &default-logging
 
 services:
   mcp-unifi:
-    image: mcp-unifi-hardening:0.25.0
+    image: mcp-unifi:0.25.0
     build: .
     user: "${MCP_UID:-1000}:${MCP_GID:-1000}"
     container_name: mcp-unifi

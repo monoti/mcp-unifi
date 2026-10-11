@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: mcp-unifi-hardening
+  repository: mcp-unifi
   pullPolicy: IfNotPresent
   # Defaults to Chart appVersion when empty.
   tag: ""

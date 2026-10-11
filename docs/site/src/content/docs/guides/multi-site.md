@@ -94,7 +94,7 @@ docker run --rm -p 127.0.0.1:3714:3714 \
   -e MCP_UNIFI_CONTROLLERS_FILE=/etc/mcp-unifi/controllers.yaml \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
   -v ./controllers.yaml:/etc/mcp-unifi/controllers.yaml:ro \
-  mcp-unifi-hardening:0.25.0
+  mcp-unifi:0.25.0
 ```
 
 ## Stub mode with two controllers
@@ -120,7 +120,7 @@ docker run --rm -p 127.0.0.1:3714:3714 \
   -e MCP_UNIFI_CONTROLLERS_FILE=/etc/mcp-unifi/controllers.yaml \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
   -v ./controllers.yaml:/etc/mcp-unifi/controllers.yaml:ro \
-  mcp-unifi-hardening:0.25.0
+  mcp-unifi:0.25.0
 ```
 
 Each controller gets its own in-memory state. Creating a VLAN on `home` does not affect `office`.

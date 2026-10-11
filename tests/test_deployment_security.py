@@ -15,7 +15,7 @@ def test_compose_contains_local_build_loopback_and_writable_audit_volume():
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
     service = compose["services"]["mcp-unifi"]
     assert service["build"] == "."
-    assert service["image"].startswith("mcp-unifi-hardening:")
+    assert service["image"].startswith("mcp-unifi:")
     assert service["ports"] == ["127.0.0.1:${MCP_PORT:-3714}:${MCP_PORT:-3714}"]
     assert service["read_only"] is True
     assert service["environment"]["MCP_UNIFI_READONLY"] == "true"
@@ -30,7 +30,7 @@ def test_helm_safe_defaults_and_audit_readiness():
     assert values["readOnly"] is True
     assert values["auth"]["required"] is True
     assert values["readinessProbe"]["httpGet"]["path"] == "/ready"
-    assert values["image"]["repository"] == "mcp-unifi-hardening"
+    assert values["image"]["repository"] == "mcp-unifi"
     assert values["securityContext"]["readOnlyRootFilesystem"] is True
     assert "fsGroup" not in values["podSecurityContext"]
 

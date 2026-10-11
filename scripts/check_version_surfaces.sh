@@ -43,7 +43,7 @@ manifest=$(python3 -c "import json;print(json.load(open('manifest.json'))['versi
 server_version=$(python3 -c "import json;print(json.load(open('server.json'))['version'])")
 server_oci=$(python3 -c "import json;print(json.load(open('server.json'))['packages'][0]['identifier'])")
 expected_oci="ghcr.io/${REPO}:${VERSION}"
-compose_image=$(grep -E "image: mcp-unifi-hardening:" docker-compose.yml | head -1 | sed -E 's/.*image: (.+)/\1/')
+compose_image=$(grep -E "image: mcp-unifi:" docker-compose.yml | head -1 | sed -E 's/.*image: (.+)/\1/')
 chart_app=$(grep -E '^appVersion:' charts/mcp-unifi/Chart.yaml | head -1 | sed -E 's/appVersion: "?([^"]+)"?/\1/')
 
 check "pyproject.toml version" "${VERSION}" "${pyproject}"
@@ -51,7 +51,7 @@ check "src/mcp_unifi/__init__.py __version__" "${VERSION}" "${init}"
 check "manifest.json version" "${VERSION}" "${manifest}"
 check "server.json version" "${VERSION}" "${server_version}"
 check "server.json packages[0].identifier" "${expected_oci}" "${server_oci}"
-check "docker-compose.yml image" "mcp-unifi-hardening:${VERSION}" "${compose_image}"
+check "docker-compose.yml image" "mcp-unifi:${VERSION}" "${compose_image}"
 check "charts/mcp-unifi/Chart.yaml appVersion" "${VERSION}" "${chart_app}"
 
 # release.yml publishes this section verbatim as the GitHub release body.

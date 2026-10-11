@@ -20,7 +20,7 @@ docker run -d --rm -p 127.0.0.1:3714:3714 \
   -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=true \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  --name mcp-unifi mcp-unifi-hardening:0.25.0
+  --name mcp-unifi mcp-unifi:0.25.0
 ```
 
 Add to `cline_mcp_settings.json`, passing the same token as an `Authorization` header:

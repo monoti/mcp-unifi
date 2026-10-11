@@ -51,3 +51,4 @@ uv.lock
 
 # Claude Code agent worktrees and local session state (never part of the repo).
 .claude/
+.audit/
