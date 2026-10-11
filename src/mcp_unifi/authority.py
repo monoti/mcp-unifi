@@ -186,6 +186,8 @@ class Authority:
             latency_ms=0,
             client_id=operation.principal,
         )
+        if not self.healthy:
+            raise UniFiError("Mutation approval or durable audit is unavailable.")
         if not audit.get_audit_log().healthy:
             raise UniFiError("Audit is unhealthy. No controller write was made.")
         if all(time.time() >= grant.expires for grant in matches):
@@ -257,8 +259,7 @@ class Authority:
                     "Controller outcome is uncertain because audit completion failed."
                 ) from exc
 
-    def completion_failed(self, operation: Operation) -> None:
-        self.healthy = False
+    def try_record_uncertain_outcome(self, operation: Operation) -> None:
         try:
             with closing(self._connection()) as connection, connection:
                 for (owner, _controller, _site), grant_id in operation.attempts.items():
@@ -267,7 +268,6 @@ class Authority:
                             "UPDATE attempts SET outcome='uncertain' WHERE grant_id=?", (grant_id,)
                         )
         except (OSError, sqlite3.Error, UniFiError):
-            # The committed pending intent still prevents replay if storage has failed.
             pass
 
 

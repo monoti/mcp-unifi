@@ -437,9 +437,10 @@ def test_secure_transport_and_write_defaults():
     assert settings.controllers[0].verify_ssl is True
 
 
-def test_stdio_rejects_stdout_audit(monkeypatch):
+@pytest.mark.parametrize("sink", ["stdout", "STDOUT", " stdout ", " \tSTDOUT\n"])
+def test_stdio_rejects_stdout_audit(monkeypatch, sink):
     from mcp_unifi.server import build_server
 
-    monkeypatch.setenv("MCP_UNIFI_AUDIT_SINK", "stdout")
+    monkeypatch.setenv("MCP_UNIFI_AUDIT_SINK", sink)
     with pytest.raises(ValueError, match="stdout audit"):
         build_server(Settings())

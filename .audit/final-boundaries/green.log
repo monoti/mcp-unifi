@@ -1,0 +1,12 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.3, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/monoti/projects/homelab/network/mcp-unifi-final-boundaries
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, cov-7.1.0, hypothesis-6.168.4, asyncio-1.4.0, anyio-4.15.1, respx-0.23.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 61 items / 56 deselected / 5 selected
+
+tests/test_operator_grants.py .                                          [ 20%]
+tests/test_config.py ....                                                [100%]
+
+======================= 5 passed, 56 deselected in 0.60s =======================

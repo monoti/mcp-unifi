@@ -220,7 +220,7 @@ def audited(
                     for authority in authorities:
                         authority.healthy = False
                     for authority in authorities:
-                        authority.completion_failed(operation)
+                        authority.try_record_uncertain_outcome(operation)
                 raise
             finally:
                 OPERATION.reset(operation_token)

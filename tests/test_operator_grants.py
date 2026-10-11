@@ -495,6 +495,91 @@ async def test_cancelled_completion_blocks_readiness_and_later_requests(
         await client.aclose()
 
 
+@respx.mock
+async def test_queued_intent_cannot_write_after_cancelled_completion(authority, monkeypatch):
+    from mcp_unifi import server as server_module
+    from mcp_unifi.modules._audit import audited
+
+    completion_entered = asyncio.Event()
+    intent_queued = asyncio.Event()
+
+    class ObservedLock(asyncio.Lock):
+        async def acquire(self):
+            if self.locked():
+                intent_queued.set()
+            return await super().acquire()
+
+    class BlockedCompletionSink:
+        async def write(self, event):
+            if event.result != {"phase": "intent"} and event.args.get("name") == "first":
+                completion_entered.set()
+                await asyncio.Event().wait()
+
+        async def aclose(self):
+            pass
+
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+
+    @audited("queued_completion_probe", mutates=True)
+    async def mutation(name):
+        await client.create_wlan({"name": name})
+        return {"created": True}
+
+    grant(authority, Operation("alice", "queued_completion_probe", {"name": "first"}))
+    (authority.grants / "grant.json").rename(authority.grants / "first.json")
+    grant(authority, Operation("alice", "queued_completion_probe", {"name": "second"}))
+    second_path = authority.grants / "grant.json"
+    second_grant = json.loads(second_path.read_text())
+    second_grant["id"] = "second-grant"
+    second_path.write_text(json.dumps(second_grant))
+    registry = build_registry(Settings(stub_mode=True))
+    registry.authority = authority
+    monkeypatch.setattr(server_module, "build_registry", lambda *args, **kwargs: registry)
+    server = build_server(Settings(stub_mode=True, readonly=False, auth_required=False))
+    log = audit.AuditLog(BlockedCompletionSink())
+    log._lock = ObservedLock()
+    audit.set_audit_log(log)
+    first = asyncio.create_task(mutation(name="first"))
+    second = None
+    try:
+        await asyncio.wait_for(completion_entered.wait(), timeout=5)
+        assert route.call_count == 1
+        second = asyncio.create_task(mutation(name="second"))
+        await asyncio.wait_for(intent_queued.wait(), timeout=5)
+        assert not second.done()
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(first, timeout=5)
+        assert authority.healthy is False
+        assert log.healthy is True
+        second_result = (
+            await asyncio.wait_for(asyncio.gather(second, return_exceptions=True), timeout=5)
+        )[0]
+        assert route.call_count == 1
+        assert isinstance(second_result, UniFiError)
+        assert "unavailable" in str(second_result)
+        with closing(sqlite3.connect(authority.journal)) as connection:
+            assert connection.execute("SELECT grant_id,outcome FROM attempts").fetchall() == [
+                ("grant-one", "uncertain")
+            ]
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(server.http_app()), base_url="http://test"
+        ) as http_client:
+            assert (await http_client.get("/ready")).status_code == 503
+    finally:
+        first.cancel()
+        if second is not None:
+            second.cancel()
+        await asyncio.gather(
+            first, *([second] if second is not None else []), return_exceptions=True
+        )
+        await client.aclose()
+
+
 async def test_recorded_exception_outcome_keeps_authority_healthy(authority):
     from mcp_unifi.modules._audit import audited
 
