@@ -10,7 +10,7 @@
 
 An [MCP server](https://modelcontextprotocol.io/) built around the assumption that LLM-driven infrastructure calls need guardrails. Every destructive tool accepts `dry_run=True` and returns the predicted change set without writing. Composite tools (`create_iot_network`, `create_guest_network`, `provision_homelab_service`, `provision_camera`) capture pre-state and roll back applied steps on partial failure. Calls produce sanitized JSONL records when the sink is healthy. Real mutations fail closed on audit or journal failure; the included `mcp-unifi-replay` CLI can re-issue a log against a fresh controller.
 
-Beyond the safety substrate: **Network** tools for devices, AP radio tuning, VLANs, WLANs, firewall, switch ports, port forwards, DHCP reservations, AP groups, observability, Threat Management / IDS-IPS, Honeypot, and Teleport VPN, plus opt-in **Protect** (cameras, motion events, smart detections, recording config) and **Access** (doors, credentials, visitors, badge events, hubs / readers). Every tool accepts a `controller` parameter so one server instance manages multiple UniFi sites. Speaks both **stdio** (Claude Desktop, `uvx`, `.dxt`) and **Streamable HTTP** (Docker, Helm). The full, always-current tool list is in the auto-generated [Tool Manifest](https://pete-builds.github.io/mcp-unifi/tools/). Upstream reports support for UniFi OS gateways running UniFi Network 9.x or newer (UDM, UDM Pro, UDM SE, UCG-Fiber, UCG-Ultra, UDR, UDW, UniFi OS Server), authenticated with a local API key from Settings → Control Plane → Integrations. Upstream reports verification against a UCG-Fiber on UniFi OS 5.1.33 running UniFi Network 10.6.101 (2026-09-13). Firewall reads cover both the legacy rulesets (`list_firewall_rules`) and the Zone-Based Firewall (`list_firewall_policies`, `list_firewall_zones`), and `audit_open_ports` checks both, so a site that has migrated to zones is not reported as having no firewall. Firewall writes (`create_firewall_rule` and friends) still target the legacy `/rest/firewallrule` API and do not create zone policies. No Site Manager or cloud account required.
+Beyond the safety substrate: **Network** tools for devices, AP radio tuning, VLANs, WLANs, firewall, switch ports, port forwards, DHCP reservations, AP groups, observability, Threat Management / IDS-IPS, Honeypot, and Teleport VPN, plus opt-in **Protect** (cameras, motion events, smart detections, recording config) and **Access** (doors, credentials, visitors, badge events, hubs / readers). Every tool accepts a `controller` parameter so one server instance manages multiple UniFi sites. Speaks both **stdio** (local checkout, Claude Desktop, locally built `.dxt`) and **Streamable HTTP** (Docker, Helm). The full, always-current tool list is in the auto-generated [Tool Manifest](docs/site/src/data/tool-manifest.json). Upstream reports support for UniFi OS gateways running UniFi Network 9.x or newer (UDM, UDM Pro, UDM SE, UCG-Fiber, UCG-Ultra, UDR, UDW, UniFi OS Server), authenticated with a local API key from Settings → Control Plane → Integrations. Upstream reports verification against a UCG-Fiber on UniFi OS 5.1.33 running UniFi Network 10.6.101 (2026-09-13). Firewall reads cover both the legacy rulesets (`list_firewall_rules`) and the Zone-Based Firewall (`list_firewall_policies`, `list_firewall_zones`), and `audit_open_ports` checks both, so a site that has migrated to zones is not reported as having no firewall. Firewall writes (`create_firewall_rule` and friends) still target the legacy `/rest/firewallrule` API and do not create zone policies. No Site Manager or cloud account required.
 
 ## Install and operate this fork
 
@@ -36,7 +36,7 @@ All config is read from environment variables (and `.env` when present). The six
 | `STUB_MODE` | `true` | When `false`, real-mode controller config is required. |
 | `UNIFI_HOST` | (empty) | Gateway IP or hostname. Required in real mode. |
 | `UNIFI_API_KEY` | (empty) | Local API key. Required in real mode. |
-| `MCP_UNIFI_READONLY` | `true` | When `true`, mutating tools are hidden and refused. See the [Security guide](https://pete-builds.github.io/mcp-unifi/guides/security/#read-only-mode). |
+| `MCP_UNIFI_READONLY` | `true` | When `true`, mutating tools are hidden and refused. See the [Security guide](docs/site/src/content/docs/guides/security.md#read-only-mode). |
 | `MCP_UNIFI_MODULES_ENABLED` | `network` | Set to `network,protect,access` to enable all three modules. |
 | `MCP_UNIFI_CONTROLLERS_FILE` | (unset) | YAML file with named controllers for multi-site. |
 | `MCP_UNIFI_OTEL_ENABLED` | `false` | Optional OpenTelemetry tracing, one span per tool call. Off by default and the SDK is not a dependency. See [Operations](docs/operations.md). |
@@ -47,7 +47,7 @@ All config is read from environment variables (and `.env` when present). The six
 | `MCP_UNIFI_CLIENT_ID` | (unset) | Client name for the bare token in `MCP_UNIFI_AUTH_TOKEN_FILE`. |
 | `UNIFI_PINNED_CERT` | (unset) | Path to the console's own certificate (PEM) from `mcp-unifi-pin-cert`. When set, that certificate is the only one the server will accept from this controller. See below. |
 
-Full env var reference and the multi-site YAML schema are in the [Configuration docs](https://pete-builds.github.io/mcp-unifi/reference/configuration/).
+Full env var reference and the multi-site YAML schema are in the [Configuration docs](docs/site/src/content/docs/reference/configuration.md).
 
 ### File-backed secrets
 
@@ -68,9 +68,9 @@ Then set `pinned_cert: /etc/mcp-unifi/pins/home.pem` on the controller in the YA
 
 ## How this is built
 
-The engineering scaffolding around the tool surface (see the [Tool Manifest](https://pete-builds.github.io/mcp-unifi/tools/) for the current count), in case you want to know what's holding it up:
+The engineering scaffolding around the tool surface (see the [Tool Manifest](docs/site/src/data/tool-manifest.json) for the current count), in case you want to know what's holding it up:
 
-**Test discipline.** ~880 tests across unit, integration, and property-based (Hypothesis) — see `pytest --collect-only` for the current count. HTTP is mocked with respx so tests don't hit a real controller. Coverage gated at 80% branch coverage in CI; run coverage locally for the current result.
+**Test discipline.** Unit, integration, and property-based Hypothesis tests. Run `pytest --collect-only` for the current count. HTTP is mocked with respx so tests don't hit a real controller. Coverage gated at 80% branch coverage in CI; run coverage locally for the current result.
 
 **Code quality gates.** Ruff (pycodestyle, pyflakes, isort, flake8-bugbear, pyupgrade, simplify, flake8-bandit security ruleset, comprehensions) plus mypy strict (no implicit Any, unreachable code flagged, unused ignores flagged). Pre-commit hooks run lint, format, types, and regenerate the tool manifest with a drift check, so bad code never reaches CI.
 
@@ -80,11 +80,11 @@ The engineering scaffolding around the tool surface (see the [Tool Manifest](htt
 
 **Dependency hygiene.** Hash-pinned via `pip install --require-hashes`. A custom CI step verifies every pinned dep in `requirements.in` matches `requirements.lock` so no one can bump one without the other. Dependabot auto-merges safe patches. The base image is digest-pinned, not tag-pinned.
 
-**Container hardening.** Runs as non-root UID 1000, no shell, no home directory. Read-only root filesystem enforced via Docker / Helm. `/tmp` is a 16MiB tmpfs. `no-new-privileges` set. All Linux capabilities dropped. Dedicated `/health` liveness and `/ready` audit-aware readiness endpoints keep the streamable-HTTP transport from logging 406 noise on every Docker healthcheck.
+**Container hardening.** Runs as non-root UID 1000, no login shell, no home directory. Read-only root filesystem enforced via Docker / Helm. `/tmp` is a 16MiB tmpfs. `no-new-privileges` set. All Linux capabilities dropped. Dedicated `/health` liveness and `/ready` audit-aware readiness endpoints keep the streamable-HTTP transport from logging 406 noise on every Docker healthcheck.
 
 **Security posture.** Bearer-token authentication on the HTTP transport, secure by default (refuses to start without tokens). Audit log records each authenticated `client_id` per call with secret scrubbing on `api_key`, `passphrase`, `password`, `secret`, `token` substring matches. API keys wrapped in pydantic `SecretStr`. `SECURITY.md` with a private disclosure path.
 
-**Distribution surface.** GHCR (signed multi-arch), Smithery (registered), MCP Registry (listed), Helm chart (Secret/Deployment/Service/Ingress/NetworkPolicy templates), .dxt bundle, uvx / pipx.
+**Local distribution.** Build the checkout, Docker image, Helm deployment, or DXT bundle locally. This fork has no published image, package, DXT release, Smithery registration, or MCP Registry listing.
 
 **Documentation discipline.** Astro Starlight site auto-deploys to GitHub Pages. The per-tool reference pages are generated from FastMCP introspection by `scripts/generate_tool_manifest.py`, and the pre-commit hook regenerates and drift-checks them so code and docs can't diverge. CHANGELOG follows Keep a Changelog format.
 
@@ -118,15 +118,15 @@ python scripts/generate_tool_manifest.py --check  # CI-style drift check
 
 ## Docs
 
-- [Docs site](https://pete-builds.github.io/mcp-unifi/)
-- [Network tool reference](https://pete-builds.github.io/mcp-unifi/reference/network/)
-- [Protect tool reference](https://pete-builds.github.io/mcp-unifi/reference/protect/)
-- [Access tool reference](https://pete-builds.github.io/mcp-unifi/reference/access/)
-- [Multi-site setup](https://pete-builds.github.io/mcp-unifi/guides/multi-site/)
-- [Access setup](https://pete-builds.github.io/mcp-unifi/guides/access-setup/)
-- [Dry-run and audit log](https://pete-builds.github.io/mcp-unifi/guides/dry-run-audit/)
-- [Security model](https://pete-builds.github.io/mcp-unifi/guides/security/)
-- [Migration from v0.x](https://pete-builds.github.io/mcp-unifi/guides/migration/)
+- [Docs site](docs/site/src/content/docs/index.mdx)
+- [Network tool reference](docs/site/src/content/docs/reference/network.md)
+- [Protect tool reference](docs/site/src/content/docs/reference/protect.md)
+- [Access tool reference](docs/site/src/content/docs/reference/access.md)
+- [Multi-site setup](docs/site/src/content/docs/guides/multi-site.md)
+- [Access setup](docs/site/src/content/docs/guides/access-setup.md)
+- [Dry-run and audit log](docs/site/src/content/docs/guides/dry-run-audit.md)
+- [Security model](docs/site/src/content/docs/guides/security.md)
+- [Migration from v0.x](docs/site/src/content/docs/guides/migration.md)
 - [Changelog](CHANGELOG.md)
 - [Security policy](SECURITY.md)
 

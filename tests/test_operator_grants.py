@@ -1,6 +1,8 @@
 import asyncio
 import json
 import sqlite3
+import subprocess
+import sys
 import time
 from contextlib import closing
 
@@ -15,6 +17,7 @@ from mcp_unifi.authority import (
     Authority,
     Operation,
     Target,
+    initialize_journal,
     intent_digest,
     principal,
 )
@@ -32,6 +35,18 @@ def authority(tmp_path, monkeypatch):
     grants = tmp_path / "grants"
     grants.mkdir(mode=0o700)
     monkeypatch.setenv("MCP_UNIFI_STDIO_PRINCIPAL", "alice")
+    subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "mcp_unifi.cli.journal",
+            "init",
+            "--path",
+            str(tmp_path / "journal.sqlite"),
+        ],
+        check=True,
+        capture_output=True,
+    )
     return Authority(
         readonly=False,
         scopes={"alice": ["home"]},
@@ -48,7 +63,8 @@ def grant(
     path.write_text(
         json.dumps(
             {
-                "version": 1,
+                "version": 2,
+                "journal_id": authority.journal_id(),
                 "id": "grant-one",
                 "digest": digest,
                 "principal": identity,
@@ -104,7 +120,8 @@ async def test_changed_intent_or_expiry_cannot_use_grant(authority, change):
             )
     finally:
         OPERATION.reset(token)
-    assert not authority.journal.exists()
+    with closing(sqlite3.connect(authority.journal)) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
 
 
 @respx.mock
@@ -144,7 +161,8 @@ async def test_failed_audit_prevents_consumption_and_request(authority):
             await authority.begin("home", "default")
     finally:
         OPERATION.reset(token)
-    assert not authority.journal.exists()
+    with closing(sqlite3.connect(authority.journal)) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
 
 
 async def test_grant_expiring_during_audit_cannot_be_consumed(authority, monkeypatch):
@@ -166,7 +184,8 @@ async def test_grant_expiring_during_audit_cannot_be_consumed(authority, monkeyp
             await authority.begin("home", "default")
     finally:
         OPERATION.reset(token)
-    assert not authority.journal.exists()
+    with closing(sqlite3.connect(authority.journal)) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
 
 
 async def test_confirmation_is_bound_to_issuer(monkeypatch):
@@ -595,3 +614,364 @@ async def test_recorded_exception_outcome_keeps_authority_healthy(authority):
     assert OPERATION.get() is None
     with closing(sqlite3.connect(authority.journal)) as connection:
         assert connection.execute("SELECT outcome FROM attempts").fetchall() == [("uncertain",)]
+
+
+@respx.mock
+async def test_live_journal_loss_blocks_composite_backend_continuation(authority):
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+    operation = Operation("alice", "composite_probe", {})
+    grant(authority, operation)
+    token = OPERATION.set(operation)
+    try:
+        await client.create_wlan({"name": "first"})
+        assert route.call_count == 1
+        authority.journal.unlink()
+        with pytest.raises(UniFiError):
+            await client.create_wlan({"name": "second"})
+        assert route.call_count == 1
+        assert authority.healthy is False
+        assert not authority.journal.exists()
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()
+
+
+@respx.mock
+async def test_deleted_pending_row_makes_backend_outcome_uncertain(authority):
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+    operation = Operation("alice", "completion_probe", {})
+    grant(authority, operation)
+    token = OPERATION.set(operation)
+    try:
+        await client.create_wlan({"name": "first"})
+        assert route.call_count == 1
+        with closing(sqlite3.connect(authority.journal)) as connection, connection:
+            connection.execute("DELETE FROM attempts")
+        with pytest.raises(UniFiError, match="uncertain"):
+            authority.complete(operation, "success")
+        assert authority.healthy is False
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()
+
+
+@pytest.mark.parametrize("replacement", [False, True])
+@respx.mock
+async def test_journal_loss_between_calls_and_restart_never_replays(authority, replacement):
+    client = UniFiClient("gateway.test", "synthetic")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    operation = Operation("alice", "recovery_probe", {})
+    grant(authority, operation)
+    token = OPERATION.set(operation)
+    try:
+        await client.create_wlan({"name": "first"})
+        authority.complete(operation, "success")
+        authority.journal.rename(authority.journal.with_suffix(".history"))
+        if replacement:
+            initialize_journal(authority.journal)
+        OPERATION.set(Operation("alice", operation.tool, operation.arguments))
+        with pytest.raises(UniFiError):
+            await client.create_wlan({"name": "second"})
+        assert route.call_count == 1
+        assert authority.healthy is False
+        restarted = Authority(
+            readonly=False,
+            scopes=authority.scopes,
+            grants=authority.grants,
+            journal=authority.journal,
+        )
+        CLIENTS[client._client] = Target(restarted, "home", "default")
+        with pytest.raises(UniFiError):
+            await client.create_wlan({"name": "third"})
+        assert route.call_count == 1
+        if not replacement:
+            assert not authority.journal.exists()
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()
+
+
+@respx.mock
+async def test_new_generation_refuses_old_grant_and_fresh_cli_grant_succeeds_once(authority):
+    from mcp_unifi.cli.approve import create_grant
+
+    operation = Operation(
+        "alice",
+        "block_client",
+        {"mac": "aa:bb:cc:00:00:01", "controller": "default", "dry_run": False},
+    )
+    grant(authority, operation)
+    old_id = authority.journal_id()
+    authority.journal.rename(authority.journal.with_suffix(".history"))
+    initialize_journal(authority.journal)
+    restarted = Authority(
+        readonly=False, scopes=authority.scopes, grants=authority.grants, journal=authority.journal
+    )
+    assert restarted.journal_id() != old_id
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(restarted, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/cmd/stamgr").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
+    token = OPERATION.set(operation)
+    try:
+        with pytest.raises(UniFiError, match="No exact"):
+            await client.block_client(operation.arguments["mac"])
+        assert route.call_count == 0
+        settings = Settings(
+            stub_mode=False,
+            readonly=False,
+            controllers=[ControllerConfig(name="home", host="gateway.test", api_key="synthetic")],
+            controller_scopes=authority.scopes,
+            approval_dir=authority.grants,
+            mutation_journal=authority.journal,
+        )
+        await create_grant(
+            settings,
+            identity="alice",
+            controller="home",
+            tool_name="block_client",
+            arguments={"mac": operation.arguments["mac"]},
+            ttl=300,
+        )
+        await client.block_client(operation.arguments["mac"])
+        restarted.complete(operation, "success")
+        OPERATION.set(Operation("alice", operation.tool, operation.arguments))
+        with pytest.raises(UniFiError, match="consumed"):
+            await client.block_client(operation.arguments["mac"])
+        assert route.call_count == 1
+        assert restarted.healthy is True
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()
+
+
+@pytest.mark.parametrize("damage", ["schema", "generation", "metadata", "trigger", "v1"])
+async def test_invalid_journal_or_v1_grant_is_refused(authority, damage):
+    operation = Operation("alice", "probe", {})
+    grant(authority, operation)
+    if damage == "v1":
+        path = authority.grants / "grant.json"
+        value = json.loads(path.read_text())
+        value["version"] = 1
+        del value["journal_id"]
+        path.write_text(json.dumps(value))
+    else:
+        with closing(sqlite3.connect(authority.journal)) as connection, connection:
+            connection.execute(
+                {
+                    "schema": "DROP TABLE attempts",
+                    "generation": "UPDATE journal_meta SET journal_id='invalid'",
+                    "metadata": "DELETE FROM journal_meta",
+                    "trigger": (
+                        "CREATE TRIGGER erase AFTER INSERT ON attempts "
+                        "BEGIN DELETE FROM attempts; END"
+                    ),
+                }[damage]
+            )
+    token = OPERATION.set(operation)
+    try:
+        with pytest.raises(UniFiError):
+            await authority.begin("home", "default")
+        assert not operation.attempts
+        assert authority.healthy is (damage == "v1")
+    finally:
+        OPERATION.reset(token)
+
+
+async def test_missing_state_server_and_issuer_do_not_create(tmp_path):
+    from mcp_unifi.cli.approve import create_grant
+
+    tmp_path.chmod(0o700)
+    grants = tmp_path / "grants"
+    grants.mkdir(mode=0o700)
+    journal = tmp_path / "missing.sqlite"
+    settings = Settings(
+        stub_mode=False,
+        readonly=False,
+        auth_required=False,
+        controllers=[ControllerConfig(name="home", host="gateway.test", api_key="synthetic")],
+        controller_scopes={"alice": ["home"]},
+        approval_dir=grants,
+        mutation_journal=journal,
+    )
+    server = build_server(settings)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(server.http_app()), base_url="http://test"
+    ) as client:
+        assert (await client.get("/ready")).status_code == 503
+    with pytest.raises(UniFiError):
+        await create_grant(
+            settings,
+            identity="alice",
+            controller="home",
+            tool_name="block_client",
+            arguments={"mac": "aa:bb:cc:00:00:01"},
+            ttl=300,
+        )
+    assert not journal.exists()
+    assert list(grants.iterdir()) == []
+
+
+@pytest.mark.parametrize("existing", ["file", "symlink", "fifo", "directory"])
+def test_initializer_refuses_existing_paths_and_secure_path_requires_regular_files(
+    tmp_path, existing
+):
+    import os
+
+    from mcp_unifi.authority import secure_path
+
+    tmp_path.chmod(0o700)
+    path = tmp_path / "journal"
+    if existing == "file":
+        path.write_bytes(b"private history")
+        path.chmod(0o600)
+    elif existing == "symlink":
+        path.symlink_to(tmp_path / "absent")
+    elif existing == "fifo":
+        os.mkfifo(path, 0o600)
+    else:
+        path.mkdir(mode=0o700)
+    with pytest.raises(FileExistsError):
+        initialize_journal(path)
+    if existing == "file":
+        assert path.read_bytes() == b"private history"
+    else:
+        with pytest.raises(UniFiError):
+            secure_path(path)
+
+
+@respx.mock
+async def test_deleted_pending_row_blocks_composite_continuation(authority):
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+    operation = Operation("alice", "composite_probe", {})
+    grant(authority, operation)
+    token = OPERATION.set(operation)
+    try:
+        await client.create_wlan({"name": "first"})
+        with closing(sqlite3.connect(authority.journal)) as connection, connection:
+            connection.execute("DELETE FROM attempts")
+        with pytest.raises(UniFiError):
+            await client.create_wlan({"name": "second"})
+        assert route.call_count == 1
+        assert authority.healthy is False
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()
+
+
+@pytest.mark.parametrize("stage", ["continuation", "completion"])
+@respx.mock
+async def test_same_path_replacement_blocks_remaining_backend_or_completion(authority, stage):
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+    operation = Operation("alice", "replace_probe", {})
+    grant(authority, operation)
+    token = OPERATION.set(operation)
+    try:
+        await client.create_wlan({"name": "first"})
+        authority.journal.rename(authority.journal.with_suffix(".history"))
+        initialize_journal(authority.journal)
+        with pytest.raises(UniFiError):
+            if stage == "continuation":
+                await client.create_wlan({"name": "second"})
+            else:
+                authority.complete(operation, "success")
+        assert route.call_count == 1
+        assert authority.healthy is False
+        authority.journal.unlink()
+        authority.journal.with_suffix(".history").rename(authority.journal)
+        with pytest.raises(UniFiError, match="unavailable"):
+            await client.create_wlan({"name": "third"})
+        assert route.call_count == 1
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()
+
+
+def test_initialization_failure_preserves_unusable_file_for_inspection(tmp_path, monkeypatch):
+    import os
+
+    tmp_path.chmod(0o700)
+    journal = tmp_path / "journal.sqlite"
+    monkeypatch.setattr(
+        os, "fsync", lambda descriptor: (_ for _ in ()).throw(OSError("sync failure"))
+    )
+    with pytest.raises(OSError):
+        initialize_journal(journal)
+    assert journal.is_file()
+    with pytest.raises(FileExistsError):
+        initialize_journal(journal)
+
+
+def test_concurrent_initializers_create_exactly_one_generation(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+
+    tmp_path.chmod(0o700)
+    journal = tmp_path / "journal.sqlite"
+
+    def attempt():
+        try:
+            return initialize_journal(journal)
+        except FileExistsError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        values = list(pool.map(lambda _: attempt(), range(2)))
+    generations = [value for value in values if value is not None]
+    assert len(generations) == 1
+    with closing(sqlite3.connect(journal)) as connection:
+        assert connection.execute("SELECT journal_id FROM journal_meta").fetchall() == [
+            (generations[0],)
+        ]
+
+
+@respx.mock
+async def test_unexpected_intent_serialization_error_is_generic_and_blocks_backend(
+    authority, monkeypatch
+):
+    from mcp_unifi import authority as authority_module
+
+    operation = Operation("alice", "serialize_probe", {})
+    grant(authority, operation)
+
+    def fail(value):
+        raise ValueError("synthetic serialization secret")
+
+    monkeypatch.setattr(authority_module, "scrub", fail)
+    client = UniFiClient("gateway.test", "synthetic")
+    CLIENTS[client._client] = Target(authority, "home", "default")
+    route = respx.post("https://gateway.test:443/proxy/network/api/s/default/rest/wlanconf").mock(
+        return_value=httpx.Response(200, json={"data": [{"_id": "new"}]})
+    )
+    token = OPERATION.set(operation)
+    try:
+        with pytest.raises(UniFiError, match="Durable prewrite") as caught:
+            await client.create_wlan({"name": "first"})
+        assert "synthetic serialization secret" not in str(caught.value)
+        assert route.call_count == 0
+        assert authority.healthy is False
+        assert not operation.attempts
+        with closing(sqlite3.connect(authority.journal)) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] == 0
+    finally:
+        OPERATION.reset(token)
+        await client.aclose()

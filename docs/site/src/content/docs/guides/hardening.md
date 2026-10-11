@@ -3,8 +3,6 @@ title: Hardened fork operations
 description: Safe defaults, external approvals, storage, and migration.
 ---
 
-# Operating the hardened fork
-
 This fork defaults to stdio, read-only tools, and verified controller TLS. The fork has not published an image or Registry entry. Build this checkout instead of pulling an upstream image. Historical upstream installation and firmware claims do not verify this fork.
 
 ## Read-only setup
@@ -36,16 +34,25 @@ Enabling the write catalog does not authorize a controller request. For a local 
 | `MCP_UNIFI_AUDIT_SINK=file` | Additional sanitized file audit log. |
 | `MCP_UNIFI_AUDIT_PATH=/protected/state/audit.jsonl` | Audit file outside the read-only application filesystem. |
 
+Before starting a writable server or issuing an approval, provision the private state directory for the service UID. Initialize the configured absent journal path with the installed checkout's operator command.
+
+```sh
+/absolute/path/to/mcp-unifi/.venv/bin/mcp-unifi-journal init \
+  --path /protected/state/mutations.sqlite
+```
+
+Only this command creates journal state. It refuses any existing path, including symlinks. It commits schema version 2 and a random journal generation, then syncs the file and parent directory. An initialization failure leaves the existing file for operator inspection. Server readiness and approval issuance open existing state only and never create or repair it.
+
 Run the approval CLI outside the model's tool environment. Use the same controller, site, modules, and scope configuration as the server. Place the exact original tool arguments in a protected JSON file. Secrets participate in the digest before redaction.
 
 ```sh
-mcp-unifi-approve --principal alice --controller home --tool block_client \
+/absolute/path/to/mcp-unifi/.venv/bin/mcp-unifi-approve --principal alice --controller home --tool block_client \
   --arguments-file /protected/operator/block-client.json --ttl 300
 ```
 
-The CLI prints the grant filename. It does not contact a controller. The default lifetime is five minutes and the maximum is one hour. Default arguments are normalized by the registered tool signature. The grant binds the identity, resolved controller, configured site, original tool, and complete arguments. Changing any bound value requires a new approval. A destructive preview token belongs to its issuer. Approval names the original destructive tool, such as `delete_wlan`, rather than `confirm_destructive_action`.
+The CLI prints the grant filename. It does not contact a controller. The default lifetime is five minutes and the maximum is one hour. Default arguments are normalized by the registered tool signature. The version 2 grant binds the journal generation, identity, resolved controller, configured site, original tool, and complete arguments. Changing any bound value requires a new approval. A destructive preview token belongs to its issuer. Approval names the original destructive tool, such as `delete_wlan`, rather than `confirm_destructive_action`.
 
-A grant permits one top-level invocation, including its constituent requests and compensation. It is consumed durably before the first request and stays consumed across process restarts or uncertain outcomes. The SQLite row also stores the sanitized original intent as the durable prewrite audit record. The journal uses synchronous EXTRA, requests fullfsync on macOS, and syncs the parent directory after initialization. Audit preparation failure prevents execution. Completion audit failure or cancellation marks the authority unhealthy and blocks later writes. The server attempts to persist an uncertain outcome without waiting on the failed sink again. Inspect the journal and controller state before issuing a replacement grant after an uncertain outcome. A fresh identical approval can be used even while older consumed grant files remain. Replay and rollback require their own approved original invocation.
+A grant permits one top-level invocation, including its constituent requests and compensation. It is consumed durably before the first request and stays consumed across process restarts or uncertain outcomes. The SQLite row also stores the sanitized original intent as the durable prewrite audit record. The journal uses synchronous EXTRA, requests fullfsync on macOS, and syncs the parent directory after initialization. Audit preparation failure prevents execution. A missing or replaced journal, malformed schema or generation, or a missing pending completion row makes the authority permanently unhealthy for that process. Every constituent controller request checks live journal identity and pending consumption. Completion audit failure or cancellation marks the authority unhealthy and blocks later writes. The server attempts to persist an uncertain outcome without waiting on the failed sink again. Inspect the journal and controller state before issuing a replacement grant after an uncertain outcome. A fresh identical approval can be used even while older consumed grant files remain. Replay and rollback require their own approved original invocation.
 
 ## Filesystem ownership and deployment
 
@@ -56,6 +63,16 @@ Compose builds `mcp-unifi-hardening:0.25.0` locally and publishes HTTP on loopba
 The Helm chart uses `fsGroup` only for ephemeral read-only storage. Persistent claims require operator-provisioned ownership and omit `fsGroup` so Kubernetes cannot rewrite protected grant or journal permissions. Writable Helm mode requires one replica, an audit claim, a read-only approval claim, and explicit controller scopes. Provision both claim roots for the configured service UID before mounting. Do not configure `fsGroup` for persistent claims. Use a durable local filesystem with SQLite locking and directory fsync semantics. These settings depend on the filesystem and storage honoring sync requests. Network filesystems and multiple write replicas are unsupported.
 
 `/health` reports process liveness. `/ready` checks the audit sink and authority storage, and returns `503` when unsafe to serve. Readiness does not prove controller firmware compatibility or API permissions. Docker runtime and live Kubernetes volume behavior have not been verified in this hardening task.
+
+## Recover missing or replaced journal state
+
+Stop every writable server and approval issuer before recovery. Privately preserve the prior journal, SQLite sidecar files, grant files, and audit history with owner-only permissions. Do not delete history to make an existing path pass initialization. Inspect pending or uncertain operations and actual controller outcomes before approving a replacement operation.
+
+Select an absent protected journal path, or move the preserved state away from the configured path while all writers remain stopped. Run `mcp-unifi-journal init` explicitly to create a new generation. Update server and issuer configuration together if the path changes. Restart servers, verify readiness, and issue fresh version 2 grants for operations you still intend.
+
+All version 1 grants are rejected. There is no automatic migration, archival, or recovery command. A preserved version 1 journal requires the same stopped-writer preservation and explicit new-generation procedure. Old version 2 grants remain invalid against a new generation even when unexpired. Recovery does not establish the outcome of a previous controller request or clear its uncertainty.
+
+The server pins device, inode, and generation after its first successful open. Once it observes a storage integrity failure, restoring a file does not restore write health without restarting the process. These checks detect accidental state loss and replacement. They do not defend against privileged rollback of both journal and grants, or prove durability under physical power loss.
 
 ## Packaging and migration
 

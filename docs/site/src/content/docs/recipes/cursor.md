@@ -1,64 +1,33 @@
 ---
 draft: false
 title: Cursor
-description: Wire mcp-unifi into Cursor's MCP config.
+description: Run the installed hardened checkout over stdio.
 ---
 
-This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+Install this checkout using the [hash-locked installation guide](../guides/hardening.md#read-only-setup). This fork has no published package or DXT release. Upstream install commands do not include these security changes.
 
-
-Cursor reads MCP server config from `.cursor/mcp.json` (project scope) or `~/.cursor/mcp.json` (user scope).
-
-## Streamable HTTP (Docker)
-
-Point Cursor at a running container. The HTTP transport is secure by default — every request needs an `Authorization: Bearer <token>` header:
+Edit `.cursor/mcp.json` for a project or `~/.cursor/mcp.json` for your user. Replace the command with the absolute path to your installed checkout's `.venv/bin/mcp-unifi`. On Windows, use the absolute `.venv/Scripts/mcp-unifi.exe` path.
 
 ```json
 {
   "mcpServers": {
     "unifi": {
-      "url": "http://localhost:3714/mcp",
-      "headers": {
-        "Authorization": "Bearer <paste-token-from-openssl-rand-hex-32>"
-      }
-    }
-  }
-}
-```
-
-Start the container in a separate terminal, passing the same token:
-
-```bash
-export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-docker run -d --rm -p 127.0.0.1:3714:3714 \
-  -e MCP_TRANSPORT=streamable-http \
-  -e MCP_HOST=0.0.0.0 \
-  -e STUB_MODE=true \
-  -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-  --name mcp-unifi mcp-unifi-hardening:0.25.0
-```
-
-## Stdio (uvx)
-
-```json
-{
-  "mcpServers": {
-    "unifi": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/pete-builds/mcp-unifi",
-        "mcp-unifi"
-      ],
+      "command": "/absolute/path/to/mcp-unifi/.venv/bin/mcp-unifi",
       "env": {
         "MCP_TRANSPORT": "stdio",
         "STUB_MODE": "false",
-        "UNIFI_HOST": "192.168.1.1",
-        "UNIFI_API_KEY": "<your-local-api-key>"
+        "MCP_UNIFI_READONLY": "true",
+        "UNIFI_HOST": "gateway.example.test",
+        "UNIFI_API_KEY_FILE": "/protected/secrets/unifi-api-key",
+        "UNIFI_VERIFY_SSL": "true",
+        "MCP_UNIFI_AUDIT_SINK": "file",
+        "MCP_UNIFI_AUDIT_PATH": "/protected/state/audit.jsonl"
       }
     }
   }
 }
 ```
 
-Restart Cursor after editing the config.
+Store the controller API key in the protected file outside the repository and client configuration. Configure a trusted CA or an independently verified certificate pin when the controller certificate requires it. Keep TLS verification enabled. Use `STUB_MODE=true` to try synthetic tools without a controller.
+
+Fully quit and restart Cursor after editing configuration. Start a conversation and request a read such as listing devices. For writable mode, follow [external approval and journal setup](../guides/hardening.md#approving-a-real-mutation). Keep the approving operator's command and files inaccessible to the caller's other tools.

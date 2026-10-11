@@ -7,6 +7,7 @@ import os
 import sqlite3
 import stat
 import time
+import uuid
 from contextlib import closing
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -51,7 +52,8 @@ def principal() -> str | None:
 class OperatorGrant(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    version: int = Field(ge=1, le=1)
+    version: int = Field(ge=2, le=2)
+    journal_id: str = Field(pattern=r"^[a-f0-9]{32}$")
     id: str = Field(min_length=1, max_length=128)
     digest: str = Field(pattern=r"^[a-f0-9]{64}$")
     principal: str = Field(min_length=1, max_length=256)
@@ -84,8 +86,67 @@ def secure_path(path: Path, *, directory: bool = False) -> None:
         raise UniFiError("Approval and journal paths require owner-only permissions.")
     if info.st_uid != os.getuid():
         raise UniFiError("Approval and journal paths must belong to the service user.")
-    if directory != stat.S_ISDIR(info.st_mode):
+    if not (stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)):
         raise UniFiError("Invalid approval or journal path type.")
+
+
+ATTEMPTS_SCHEMA = (
+    "CREATE TABLE attempts (grant_id TEXT PRIMARY KEY, digest TEXT, intent TEXT, "
+    "created REAL, outcome TEXT)"
+)
+META_SCHEMA = (
+    "CREATE TABLE journal_meta (singleton INTEGER PRIMARY KEY CHECK(singleton=1), "
+    "version INTEGER NOT NULL, journal_id TEXT NOT NULL)"
+)
+
+
+def _sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def initialize_journal(path: Path) -> str:
+    path = path.absolute()
+    secure_path(path.parent, directory=True)
+    descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    identity = os.fstat(descriptor)
+    os.close(descriptor)
+    generation = uuid.uuid4().hex
+    secure_path(path)
+    current = path.stat()
+    if (current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino):
+        raise UniFiError("Mutation journal changed during initialization.")
+    with closing(sqlite3.connect(path.as_uri() + "?mode=rw", uri=True)) as connection, connection:
+        connection.execute("PRAGMA synchronous=EXTRA")
+        connection.execute("PRAGMA fullfsync=ON")
+        current = path.stat()
+        if (current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino):
+            raise UniFiError("Mutation journal changed during initialization.")
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(ATTEMPTS_SCHEMA)
+        connection.execute(META_SCHEMA)
+        connection.execute("INSERT INTO journal_meta VALUES (1, 2, ?)", (generation,))
+    secure_path(path)
+    current = path.stat()
+    if (current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino):
+        raise UniFiError("Mutation journal changed during initialization.")
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        current = os.fstat(descriptor)
+        if (current.st_dev, current.st_ino) != (identity.st_dev, identity.st_ino):
+            raise UniFiError("Mutation journal changed during initialization.")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    _sync_directory(path.parent)
+    return generation
+
+
+class _GrantRefused(UniFiError):
+    pass
 
 
 class Authority:
@@ -102,42 +163,78 @@ class Authority:
         self.grants = grants
         self.journal = journal
         self.healthy = True
+        self._journal_identity: tuple[int, int, str] | None = None
 
     def check_scope(self, controller: str) -> None:
         if self.scopes and controller not in self.scopes.get(principal() or "", []):
             raise UniFiError("Caller is not authorized for this controller.")
 
-    def _connection(self) -> sqlite3.Connection:
+    def _check_identity(
+        self, generation: str, connection: sqlite3.Connection | None = None
+    ) -> None:
         if self.journal is None:
             raise UniFiError("A durable mutation journal is required.")
         secure_path(self.journal.parent, directory=True)
-        if not self.journal.exists():
-            try:
-                descriptor = os.open(self.journal, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            except FileExistsError:
-                pass
-            else:
-                os.close(descriptor)
         secure_path(self.journal)
-        connection = sqlite3.connect(self.journal, timeout=10)
-        connection.execute("PRAGMA synchronous=EXTRA")
-        connection.execute("PRAGMA fullfsync=ON")
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS attempts "
-            "(grant_id TEXT PRIMARY KEY, digest TEXT, intent TEXT, "
-            "created REAL, outcome TEXT)"
-        )
-        connection.commit()
+        if connection is not None and connection.execute(
+            "SELECT singleton,version,journal_id FROM journal_meta"
+        ).fetchall() != [(1, 2, generation)]:
+            raise UniFiError("Mutation journal generation changed.")
+        info = self.journal.stat()
+        identity = (info.st_dev, info.st_ino, generation)
+        if self._journal_identity is not None and identity != self._journal_identity:
+            raise UniFiError("Mutation journal identity changed.")
+
+    def _connection(self) -> sqlite3.Connection:
+        connection = None
         try:
-            descriptor = os.open(self.journal.parent, os.O_RDONLY)
-            try:
-                os.fsync(descriptor)
-            finally:
-                os.close(descriptor)
-        except OSError:
-            connection.close()
-            raise
-        return connection
+            if self.journal is None:
+                raise UniFiError("A durable mutation journal is required.")
+            secure_path(self.journal.parent, directory=True)
+            secure_path(self.journal)
+            before = self.journal.stat()
+            connection = sqlite3.connect(
+                self.journal.absolute().as_uri() + "?mode=rw", uri=True, timeout=10
+            )
+            connection.execute("PRAGMA synchronous=EXTRA")
+            connection.execute("PRAGMA fullfsync=ON")
+            schema = dict(
+                connection.execute("SELECT name, sql FROM sqlite_master WHERE sql IS NOT NULL")
+            )
+            if schema != {"attempts": ATTEMPTS_SCHEMA, "journal_meta": META_SCHEMA}:
+                raise UniFiError("Invalid mutation journal schema.")
+            rows = connection.execute(
+                "SELECT singleton,version,journal_id FROM journal_meta"
+            ).fetchall()
+            if len(rows) != 1 or rows[0][:2] != (1, 2):
+                raise UniFiError("Invalid mutation journal metadata.")
+            generation = rows[0][2]
+            if (
+                not isinstance(generation, str)
+                or len(generation) != 32
+                or any(c not in "0123456789abcdef" for c in generation)
+            ):
+                raise UniFiError("Invalid mutation journal generation.")
+            self._check_identity(generation)
+            after = self.journal.stat()
+            if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+                raise UniFiError("Mutation journal changed during open.")
+            if self._journal_identity is None:
+                self._journal_identity = (after.st_dev, after.st_ino, generation)
+            _sync_directory(self.journal.parent)
+            return connection
+        except (OSError, sqlite3.Error, UniFiError) as exc:
+            if connection is not None:
+                connection.close()
+            self.healthy = False
+            raise UniFiError("Mutation journal is unavailable or invalid.") from exc
+
+    def journal_id(self) -> str:
+        if not self.healthy:
+            raise UniFiError("Mutation approval or durable audit is unavailable.")
+        with closing(self._connection()):
+            assert self._journal_identity is not None
+            return self._journal_identity[2]
 
     async def begin(self, controller: str, site: str) -> None:
         self.check_scope(controller)
@@ -148,8 +245,25 @@ class Authority:
             raise UniFiError("Mutation approval or durable audit is unavailable.")
         if controller not in self.scopes.get(operation.principal, []):
             raise UniFiError("Writable callers require an explicit controller scope.")
+        generation = self.journal_id()
         key = (self, controller, site)
         if key in operation.attempts:
+            try:
+                with closing(self._connection()) as connection, connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    self._check_identity(generation, connection)
+                    row = connection.execute(
+                        "SELECT outcome FROM attempts WHERE grant_id=?", (operation.attempts[key],)
+                    ).fetchone()
+                    if row != ("pending",):
+                        raise UniFiError("Pending mutation journal state is missing.")
+                    self._check_identity(generation, connection)
+                self._check_identity(generation)
+            except (OSError, sqlite3.Error, UniFiError) as exc:
+                self.healthy = False
+                raise UniFiError(
+                    "Mutation journal continuation failed. No controller write was made."
+                ) from exc
             return
         digest = intent_digest(
             operation.principal, controller, site, operation.tool, operation.arguments
@@ -165,7 +279,8 @@ class Authority:
             except (OSError, ValueError) as exc:
                 raise UniFiError("Invalid operator grant file.") from exc
             if (
-                grant.digest == digest
+                grant.journal_id == generation
+                and grant.digest == digest
                 and grant.principal == operation.principal
                 and grant.controller == controller
                 and grant.site == site
@@ -195,6 +310,7 @@ class Authority:
         try:
             with closing(self._connection()) as connection, connection:
                 connection.execute("BEGIN IMMEDIATE")
+                self._check_identity(generation, connection)
                 selected_grant = next(
                     (
                         candidate
@@ -208,10 +324,10 @@ class Authority:
                     None,
                 )
                 if selected_grant is None:
-                    raise UniFiError("Operator grant has already been consumed or expired.")
+                    raise _GrantRefused("Operator grant has already been consumed or expired.")
                 grant = selected_grant
                 if time.time() >= grant.expires:
-                    raise UniFiError("Operator grant expired before durable consumption.")
+                    raise _GrantRefused("Operator grant expired before durable consumption.")
                 connection.execute(
                     "INSERT INTO attempts VALUES (?, ?, ?, ?, ?)",
                     (
@@ -232,12 +348,31 @@ class Authority:
                         "pending",
                     ),
                 )
-        except (OSError, sqlite3.Error) as exc:
+                self._check_identity(generation, connection)
+            self._check_identity(generation)
+        except _GrantRefused:
+            raise
+        except (OSError, sqlite3.Error, UniFiError, ValueError) as exc:
             self.healthy = False
             raise UniFiError(
                 "Durable prewrite audit failed. No controller write was made."
             ) from exc
         operation.attempts[key] = grant.id
+
+    def _record_outcome(self, grant_id: str, outcome: str) -> None:
+        with closing(self._connection()) as connection, connection:
+            assert self._journal_identity is not None
+            generation = self._journal_identity[2]
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_identity(generation, connection)
+            cursor = connection.execute(
+                "UPDATE attempts SET outcome=? WHERE grant_id=? AND outcome='pending'",
+                (outcome, grant_id),
+            )
+            if cursor.rowcount != 1:
+                raise UniFiError("Missing pending mutation journal outcome.")
+            self._check_identity(generation, connection)
+        self._check_identity(generation)
 
     def complete(self, operation: Operation, outcome: str) -> None:
         from mcp_unifi import audit
@@ -245,14 +380,10 @@ class Authority:
         for (owner, _controller, _site), grant_id in operation.attempts.items():
             if owner is not self:
                 continue
-            if not audit.get_audit_log().healthy:
-                self.healthy = False
-                raise UniFiError("Controller outcome is uncertain because audit completion failed.")
             try:
-                with closing(self._connection()) as connection, connection:
-                    connection.execute(
-                        "UPDATE attempts SET outcome=? WHERE grant_id=?", (outcome, grant_id)
-                    )
+                if not self.healthy or not audit.get_audit_log().healthy:
+                    raise UniFiError("Audit completion failed.")
+                self._record_outcome(grant_id, outcome)
             except (OSError, sqlite3.Error, UniFiError) as exc:
                 self.healthy = False
                 raise UniFiError(
@@ -260,15 +391,13 @@ class Authority:
                 ) from exc
 
     def try_record_uncertain_outcome(self, operation: Operation) -> None:
-        try:
-            with closing(self._connection()) as connection, connection:
-                for (owner, _controller, _site), grant_id in operation.attempts.items():
-                    if owner is self:
-                        connection.execute(
-                            "UPDATE attempts SET outcome='uncertain' WHERE grant_id=?", (grant_id,)
-                        )
-        except (OSError, sqlite3.Error, UniFiError):
-            pass
+        for (owner, _controller, _site), grant_id in operation.attempts.items():
+            if owner is not self:
+                continue
+            try:
+                self._record_outcome(grant_id, "uncertain")
+            except (OSError, sqlite3.Error, UniFiError):
+                self.healthy = False
 
 
 @dataclass(frozen=True)

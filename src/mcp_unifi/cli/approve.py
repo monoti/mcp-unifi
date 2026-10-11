@@ -15,7 +15,7 @@ from typing import Any, get_type_hints
 from fastmcp.tools import FunctionTool
 from pydantic import create_model
 
-from mcp_unifi.authority import intent_digest, secure_path
+from mcp_unifi.authority import Authority, intent_digest, secure_path
 from mcp_unifi.config import Settings
 from mcp_unifi.server import build_server
 
@@ -32,6 +32,13 @@ async def create_grant(
     if settings.approval_dir is None:
         raise ValueError("Configure MCP_UNIFI_APPROVAL_DIR.")
     secure_path(settings.approval_dir, directory=True)
+    authority = Authority(
+        readonly=False,
+        scopes=settings.controller_scopes,
+        grants=settings.approval_dir,
+        journal=settings.mutation_journal,
+    )
+    generation = authority.journal_id()
     controller_config = next(c for c in settings.controllers if c.name == controller)
     if controller not in settings.controller_scopes.get(identity, []):
         raise ValueError("Caller lacks an explicit controller scope.")
@@ -53,7 +60,8 @@ async def create_grant(
     digest = intent_digest(identity, controller, controller_config.site, tool_name, normalized)
     grant_id = str(uuid.uuid4())
     grant = {
-        "version": 1,
+        "version": 2,
+        "journal_id": generation,
         "id": grant_id,
         "principal": identity,
         "controller": controller,
@@ -61,6 +69,8 @@ async def create_grant(
         "digest": digest,
         "expires": time.time() + ttl,
     }
+    if authority.journal_id() != generation:
+        raise ValueError("Mutation journal changed during approval.")
     path = settings.approval_dir / f"{grant_id}.json"
     descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     with os.fdopen(descriptor, "w") as file:

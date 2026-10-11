@@ -50,7 +50,7 @@ def build(destination: Path) -> None:
             "assert version('mcp-unifi') == sys.argv[2]; "
             "assert mcp_unifi.server.__file__.startswith(sys.argv[1]); "
             "names = {item.name for item in distribution('mcp-unifi').entry_points}; "
-            "assert {'mcp-unifi', 'mcp-unifi-approve'} <= names; "
+            "assert {'mcp-unifi', 'mcp-unifi-approve', 'mcp-unifi-journal'} <= names; "
             "print('Verified DXT import and version ' + sys.argv[2])"
         )
         subprocess.run(  # noqa: S603

@@ -136,6 +136,26 @@ async def approve(scratch, env, principal, tool, arguments):
             await command.wait()
 
 
+async def initialize(scratch, env):
+    command = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "mcp_unifi.cli.journal",
+        "init",
+        cwd=scratch,
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        _, stderr = await asyncio.wait_for(command.communicate(), timeout=30)
+        assert command.returncode == 0, f"journal command failed: {stderr.decode()}"
+    finally:
+        if command.returncode is None:
+            command.kill()
+            await command.wait()
+
+
 async def check_http(scratch, env, config, cert, key, controller):
     away = MockController(cert, key)
     controllers = json.loads(config.read_text())
@@ -286,6 +306,7 @@ async def probe(repo: Path, output: Path):
                 "MCP_UNIFI_AUDIT_SINK": "file",
                 "LOG_LEVEL": "ERROR",
             }
+            await initialize(scratch, env)
             arguments = {"mac": "aa:bb:cc:00:00:01"}
 
             with (scratch / "server.log").open("w") as logs:
