@@ -106,6 +106,17 @@ def denied(result) -> bool:
     return result.is_error or "error" in json.dumps(result.data).lower()
 
 
+def assert_block_mutation(mutation, mac):
+    expected = {
+        "method": "POST",
+        "path": "/proxy/network/api/s/default/cmd/stamgr",
+        "body": {"cmd": "block-sta", "mac": mac},
+    }
+    assert mutation == expected, (
+        f"Unexpected approved block_client mutation. Received {mutation!r}. Expected {expected!r}."
+    )
+
+
 async def approve(scratch, env, principal, tool, arguments):
     argument_file = scratch / "approval-arguments.json"
     argument_file.write_text(json.dumps(arguments))
@@ -222,6 +233,7 @@ async def check_http(scratch, env, config, cert, key, controller):
                     assert denied(wrong_owner) and len(controller.mutations) == before
                     exact = await alice.call_tool("block_client", arguments, raise_on_error=False)
                     assert not denied(exact) and len(controller.mutations) == before + 1
+                    assert_block_mutation(controller.mutations[-1], "aa:bb:cc:00:00:02")
                     deletion = {"wlan_id": "synthetic-wlan"}
                     preview = await alice.call_tool("delete_wlan", deletion)
                     assert not denied(preview)
@@ -239,7 +251,10 @@ async def check_http(scratch, env, config, cert, key, controller):
                     )
                     assert not denied(confirmed), "owner confirmation could not use original grant"
                     assert len(controller.mutations) == before + 2
-                    assert controller.mutations[-1]["method"] == "DELETE"
+                    assert controller.mutations[-1] == {
+                        "method": "DELETE",
+                        "path": "/proxy/network/api/s/default/rest/wlanconf/synthetic-wlan",
+                    }, "granted delete_wlan wrote an unexpected WLAN resource"
                     consumed = await alice.call_tool(
                         "confirm_destructive_action", {"token": token}, raise_on_error=False
                     )
@@ -332,6 +347,7 @@ async def probe(repo: Path, output: Path):
                     assert len(controller.mutations) == 1, (
                         "granted operation did not write exactly once"
                     )
+                    assert_block_mutation(controller.mutations[-1], "aa:bb:cc:00:00:01")
                     changed = await client.call_tool(
                         "block_client", {"mac": "aa:bb:cc:00:00:02"}, raise_on_error=False
                     )
@@ -358,6 +374,7 @@ async def probe(repo: Path, output: Path):
                     )
                     assert not denied(approved_again), "consumed grant shadowed fresh approval"
                     assert len(controller.mutations) == 2
+                    assert_block_mutation(controller.mutations[-1], "aa:bb:cc:00:00:01")
             results["http"] = await check_http(scratch, env, config, cert, key, controller)
             with closing(sqlite3.connect(scratch / "mutations.sqlite3")) as journal:
                 outcomes = journal.execute("SELECT outcome FROM attempts").fetchall()

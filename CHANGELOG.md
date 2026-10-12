@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Recheck live authority before each controller request retry. Record controller-scope refusals as structured audit and telemetry denials so replay skips them.
 - Default to read-only stdio and verified TLS. Scope authenticated callers to configured controllers and require external exact-operation grants for real writes.
 - Persist one-use approvals and sanitized prewrite intent in a protected generation-bound journal. Initialize it explicitly with `mcp-unifi-journal init`; reject version 1 grants and old version 2 generations after recovery.
 - Refuse writes on missing, replaced, malformed, or unhealthy journal and audit storage, including composite continuations and cancelled completion. Require exactly one pending completion row.
@@ -16,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Clarify that backend cancellation with a durable uncertain outcome preserves healthy authority and requires fresh approval. Interrupted completion logging still blocks later writes. Verify approved simulator mutations against exact controller paths, commands, and targets.
 - Document stopped-writer history preservation, outcome inspection, explicit new-generation recovery, and local desktop installation. Existing writable deployments require the new identity, scope, grant, journal, and audit configuration.
 
 ## [Unreleased]
