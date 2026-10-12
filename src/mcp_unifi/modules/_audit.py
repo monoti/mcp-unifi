@@ -11,7 +11,7 @@ from typing import Any, ParamSpec, TypeVar
 
 from mcp_unifi import audit, telemetry
 from mcp_unifi.authority import OPERATION, Operation, principal
-from mcp_unifi.clients.errors import safe_error
+from mcp_unifi.clients.errors import ControllerScopeDenied, safe_error
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -170,6 +170,11 @@ def audited(
                         _apply_annotations()
                         latency_ms = (time.perf_counter() - start) * 1000.0
                         span.record_error(exc)
+                        denied_by = (
+                            exc.denied_by if isinstance(exc, ControllerScopeDenied) else None
+                        )
+                        if denied_by is not None:
+                            span.set(telemetry.ATTR_DENIED_BY, denied_by)
                         await log.emit(
                             controller=controller,
                             tool=tool_name,
@@ -177,6 +182,7 @@ def audited(
                             result=None,
                             success=False,
                             latency_ms=latency_ms,
+                            denied_by=denied_by,
                             error=safe_error(exc)
                             if isinstance(exc, Exception)
                             else "Call cancelled.",
@@ -190,27 +196,32 @@ def audited(
                     _apply_annotations()
                     latency_ms = (time.perf_counter() - start) * 1000.0
                     decoded = _coerce_result(result)
+                    failed = isinstance(decoded, dict) and bool(decoded.get("error"))
+                    denied_by = (
+                        operation.scope_denial.denied_by
+                        if failed and operation.scope_denial is not None
+                        else None
+                    )
+                    if denied_by is not None:
+                        span.set(telemetry.ATTR_DENIED_BY, denied_by)
                     span.set(
                         telemetry.ATTR_OUTCOME,
-                        telemetry.OUTCOME_ERROR
-                        if isinstance(decoded, dict) and decoded.get("error")
-                        else telemetry.OUTCOME_OK,
+                        telemetry.OUTCOME_ERROR if failed else telemetry.OUTCOME_OK,
                     )
                     await log.emit(
                         controller=controller,
                         tool=tool_name,
                         args=audit_args,
                         result=_coerce_result(result),
-                        success=not (isinstance(decoded, dict) and bool(decoded.get("error"))),
+                        success=not failed,
                         latency_ms=latency_ms,
                         client_id=client_id,
+                        denied_by=denied_by,
                     )
                     for authority, _controller, _site in operation.attempts:
                         authority.complete(
                             operation,
-                            "error"
-                            if isinstance(decoded, dict) and decoded.get("error")
-                            else "success",
+                            "error" if failed else "success",
                         )
                     completion_recorded = True
                     return result

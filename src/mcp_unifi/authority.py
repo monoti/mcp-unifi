@@ -12,12 +12,13 @@ from contextlib import closing
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from weakref import WeakKeyDictionary
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
+from mcp_unifi.clients.errors import ControllerScopeDenied
 from mcp_unifi.clients.errors import DiagnosticError as UniFiError
 from mcp_unifi.redaction import scrub
 
@@ -28,6 +29,7 @@ class Operation:
     tool: str
     arguments: dict[str, Any]
     attempts: dict[tuple[Authority, str, str], str] = field(default_factory=dict)
+    scope_denial: ControllerScopeDenied | None = None
 
 
 OPERATION: ContextVar[Operation | None] = ContextVar("unifi_operation", default=None)
@@ -167,7 +169,14 @@ class Authority:
 
     def check_scope(self, controller: str) -> None:
         if self.scopes and controller not in self.scopes.get(principal() or "", []):
-            raise UniFiError("Caller is not authorized for this controller.")
+            self._refuse_scope("Caller is not authorized for this controller.")
+
+    def _refuse_scope(self, message: str) -> NoReturn:
+        denial = ControllerScopeDenied(message)
+        operation = OPERATION.get()
+        if operation is not None:
+            operation.scope_denial = denial
+        raise denial
 
     def _check_identity(
         self, generation: str, connection: sqlite3.Connection | None = None
@@ -244,7 +253,7 @@ class Authority:
         if not self.healthy or self.grants is None:
             raise UniFiError("Mutation approval or durable audit is unavailable.")
         if controller not in self.scopes.get(operation.principal, []):
-            raise UniFiError("Writable callers require an explicit controller scope.")
+            self._refuse_scope("Writable callers require an explicit controller scope.")
         generation = self.journal_id()
         key = (self, controller, site)
         if key in operation.attempts:

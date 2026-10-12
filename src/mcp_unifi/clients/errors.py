@@ -8,6 +8,8 @@ are still re-exported from ``mcp_unifi.clients.unifi`` for existing imports.
 
 from __future__ import annotations
 
+from typing import Final
+
 
 class UniFiError(RuntimeError):
     """Raised on any non-2xx response or transport failure."""
@@ -15,6 +17,10 @@ class UniFiError(RuntimeError):
 
 class DiagnosticError(UniFiError):
     """An internally constructed diagnostic without external response prose."""
+
+
+class ControllerScopeDenied(DiagnosticError):
+    denied_by: Final = "scope"
 
 
 class UniFiUnsupportedError(DiagnosticError):

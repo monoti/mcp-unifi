@@ -92,10 +92,10 @@ async def request_with_retry(
     """
     from mcp_unifi.authority import before_request
 
-    await before_request(client, method, url)
     connect_retried = False
     fivexx_attempt = 0
     while True:
+        await before_request(client, method, url)
         try:
             resp = await client.request(method, url, json=json)
         except httpx.ConnectError as exc:
