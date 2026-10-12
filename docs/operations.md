@@ -65,12 +65,7 @@ disk, and that asymmetry is deliberate and documented in the audit module. A
 span has no history to preserve, so it splits them, and the SLOs below depend on
 the split: refusals must not consume an availability error budget.
 
-`outcome=ok` follows the audit log's `success` semantics exactly: it means the
-tool body returned, which includes returning a formatted error envelope because
-the controller rejected the request. A trace showing `outcome=ok` is saying
-"the server did its job", not "the change was applied". If you want "did the
-controller accept it", that is in the response body and the audit record, not
-on the span.
+`outcome=ok` means the tool returned a successful result. A formatted controller error envelope produces `outcome=error` and `success: false`. Refusals retain their separate trace outcome. Real writes also require durable prewrite audit and journal consumption; completion persistence failure reports an uncertain outcome and blocks later writes. See [Operating the hardened fork](hardening-operations.md).
 
 ### What is deliberately not on a span
 

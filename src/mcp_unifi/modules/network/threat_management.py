@@ -25,6 +25,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -94,7 +95,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             record = await backend.get_setting("ips")
         except UniFiError as exc:
             logger.exception("get_threat_management failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         return format_json(_project_get(record))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
@@ -172,7 +173,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             record = await backend.set_setting("ips", patch)
         except UniFiError as exc:
             logger.exception("set_threat_management failed")
-            return err(str(exc))
+            return err(safe_error(exc))
         return format_json(_project_get(record))
 
 

@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/pete-builds/mcp-unifi
+  repository: mcp-unifi
   pullPolicy: IfNotPresent
   # Defaults to Chart appVersion when empty.
   tag: ""
@@ -17,7 +17,7 @@ unifi:
   apiKey: ""
   port: 443
   site: default
-  verifySSL: false
+  verifySSL: true
   stubMode: false
 
 # Option B: multi-controller via existing Secret (advanced).
@@ -31,7 +31,7 @@ modulesEnabled: "network"
 # hidden from tools/list and refused on tools/call; read tools are unaffected.
 # Defense in depth on top of a read-only UniFi API key — pair the two rather
 # than picking one.
-readOnly: false
+readOnly: true
 
 # HTTP transport authentication (v0.9.0+).
 # `tokens` is a comma-separated list of bearer tokens. Each entry is either a
@@ -68,7 +68,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /health
+    path: /ready
     port: 3714
   initialDelaySeconds: 5
   periodSeconds: 10
@@ -99,6 +99,13 @@ podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
   runAsGroup: 1000
+
+audit:
+  existingClaim: ""
+
+authority:
+  controllerScopes: {}
+  approvalClaim: ""
 
 securityContext:
   allowPrivilegeEscalation: false

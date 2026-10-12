@@ -60,7 +60,7 @@ def protect_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[Settings]:
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("MCP_UNIFI_MODULES_ENABLED", "protect")
-    yield Settings(stub_mode=True, log_format="text", auth_required=False)
+    yield Settings(readonly=False, stub_mode=True, log_format="text", auth_required=False)
 
 
 @pytest.fixture

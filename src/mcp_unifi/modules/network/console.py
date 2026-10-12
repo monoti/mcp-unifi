@@ -32,6 +32,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import READ_ONLY
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi_os import (
     FIRMWARE_UPDATE_PATH,
     ProbeResult,
@@ -340,10 +341,12 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
     err = make_err(settings)
 
     def _controller_config(name: str) -> ControllerConfig:
+        registry.get(name)
+        name = registry.resolve_name(name)
         for ctrl in settings.controllers:
             if ctrl.name == name:
                 return ctrl
-        available = ", ".join(sorted(c.name for c in settings.controllers)) or "(none)"
+        available = ", ".join(registry.names()) or "(none)"
         raise KeyError(f"Unknown controller '{name}'. Available: {available}.")
 
     def _client(name: str) -> UniFiOSClient:
@@ -403,12 +406,13 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             controller: Name of the UniFi controller to target. Defaults to
                 ``"default"``.
         """
+        registry.get(controller)
         if settings.stub_mode:
             return format_json(_stub_health())
         try:
             client = _client(controller)
         except KeyError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         site = _controller_config(controller).site
         try:
             console = await client.probe_console()
@@ -462,6 +466,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             controller: Name of the UniFi controller to target. Defaults to
                 ``"default"``.
         """
+        registry.get(controller)
         if settings.stub_mode:
             return format_json(
                 {
@@ -476,7 +481,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
         try:
             client = _client(controller)
         except KeyError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         try:
             system = await client.probe_console()
             apps = await client.probe_apps()
@@ -553,19 +558,20 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             controller: Name of the UniFi controller to target. Defaults to
                 ``"default"``.
         """
+        registry.get(controller)
         if settings.stub_mode:
             return format_json({"firmware": {"version": "5.1.19"}, "stub_mode": True})
         try:
             client = _client(controller)
         except KeyError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         try:
             body = await client.get_session_json(FIRMWARE_UPDATE_PATH)
         except UniFiOSAuthError as exc:
-            return err(str(exc))
+            return err(safe_error(exc))
         except UniFiOSError as exc:
             logger.warning("get_console_firmware failed", extra={"controller": controller})
-            return err(str(exc))
+            return err(safe_error(exc))
         finally:
             await client.aclose()
         return format_json({"firmware": body, "shape": "unverified-passthrough"})

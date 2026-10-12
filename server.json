@@ -1,18 +1,18 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.pete-builds/unifi",
+  "name": "io.github.monoti/unifi",
   "title": "UniFi Gateway",
   "description": "Safe-by-default UniFi MCP: Network + Protect + Access, multi-site, dry-run, audit log.",
   "repository": {
-    "url": "https://github.com/pete-builds/mcp-unifi",
+    "url": "https://github.com/monoti/mcp-unifi",
     "source": "github"
   },
   "version": "0.25.0",
-  "websiteUrl": "https://pete-builds.github.io/mcp-unifi/",
+  "websiteUrl": "https://github.com/monoti/mcp-unifi",
   "packages": [
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/pete-builds/mcp-unifi:0.25.0",
+      "identifier": "ghcr.io/monoti/mcp-unifi:0.25.0",
       "transport": {
         "type": "streamable-http",
         "url": "http://localhost:3714/mcp"
@@ -25,7 +25,10 @@
           "isRequired": false,
           "default": "true",
           "format": "string",
-          "choices": ["true", "false"]
+          "choices": [
+            "true",
+            "false"
+          ]
         },
         {
           "name": "UNIFI_HOST",
@@ -49,11 +52,14 @@
         },
         {
           "name": "UNIFI_VERIFY_SSL",
-          "description": "Whether to verify the gateway's TLS certificate. Defaults to false because most home gateways use a self-signed cert.",
+          "description": "Verify controller TLS. Configure an independently verified certificate pin for self-signed controllers.",
           "isRequired": false,
-          "default": "false",
+          "default": "true",
           "format": "string",
-          "choices": ["true", "false"]
+          "choices": [
+            "true",
+            "false"
+          ]
         },
         {
           "name": "MCP_UNIFI_CONTROLLERS_FILE",
@@ -94,7 +100,11 @@
           "isRequired": false,
           "default": "file",
           "format": "string",
-          "choices": ["file", "stdout", "syslog"]
+          "choices": [
+            "file",
+            "stdout",
+            "syslog"
+          ]
         },
         {
           "name": "MCP_UNIFI_AUDIT_PATH",

@@ -57,9 +57,9 @@ def test_port_range_validation() -> None:
         Settings(mcp_port=99999)
 
 
-def test_transport_defaults_to_streamable_http() -> None:
+def test_transport_defaults_to_stdio() -> None:
     s = Settings()
-    assert s.mcp_transport == "streamable-http"
+    assert s.mcp_transport == "stdio"
 
 
 def test_transport_accepts_stdio() -> None:
@@ -159,7 +159,7 @@ def test_multi_controller_yaml_loads(tmp_path: Path) -> None:
     # Defaults applied.
     assert parents.port == 443
     assert parents.site == "default"
-    assert parents.verify_ssl is False
+    assert parents.verify_ssl is True
     assert parents.protect_api == "internal"
 
 
@@ -427,3 +427,20 @@ def test_default_controller_must_name_a_configured_controller() -> None:
                 ControllerConfig(name="lab", host="stub", api_key="k"),
             ],
         )
+
+
+def test_secure_transport_and_write_defaults():
+    settings = Settings()
+    assert settings.readonly is True
+    assert settings.mcp_transport == "stdio"
+    assert settings.mcp_host == "127.0.0.1"
+    assert settings.controllers[0].verify_ssl is True
+
+
+@pytest.mark.parametrize("sink", ["stdout", "STDOUT", " stdout ", " \tSTDOUT\n"])
+def test_stdio_rejects_stdout_audit(monkeypatch, sink):
+    from mcp_unifi.server import build_server
+
+    monkeypatch.setenv("MCP_UNIFI_AUDIT_SINK", sink)
+    with pytest.raises(ValueError, match="stdout audit"):
+        build_server(Settings())

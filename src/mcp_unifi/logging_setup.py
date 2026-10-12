@@ -75,6 +75,28 @@ def _scrub(value: Any) -> Any:
     return redact(value)
 
 
+def safe_message(record: logging.LogRecord) -> str:
+    def sanitize(value: Any) -> Any:
+        if isinstance(value, BaseException):
+            return type(value).__name__
+        if isinstance(value, str):
+            try:
+                return json.dumps(redact(json.loads(value)))
+            except (ValueError, TypeError):
+                return value
+        return redact(value)
+
+    message = str(sanitize(record.msg))
+    if record.args:
+        arguments = (
+            tuple(sanitize(value) for value in record.args)
+            if isinstance(record.args, tuple)
+            else sanitize(record.args)
+        )
+        message = message % arguments
+    return message
+
+
 class JsonFormatter(logging.Formatter):
     """Serialise each log record as a single JSON line."""
 
@@ -83,10 +105,10 @@ class JsonFormatter(logging.Formatter):
             "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
-            "msg": record.getMessage(),
+            "msg": "operation failed" if record.exc_info else safe_message(record),
         }
         if record.exc_info:
-            payload["exc_info"] = self.formatException(record.exc_info)
+            payload["exc_info"] = record.exc_info[0].__name__ if record.exc_info[0] else "Exception"
         # Surface any structured extras the caller passed through.
         extras = {
             key: _scrub(value)
@@ -96,6 +118,14 @@ class JsonFormatter(logging.Formatter):
         if extras:
             payload["extra"] = extras
         return json.dumps(payload, default=str)
+
+
+class SafeTextFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        if record.exc_info:
+            error_type = record.exc_info[0].__name__ if record.exc_info[0] else "Exception"
+            return f"{record.levelname} {record.name}: operation failed ({error_type})"
+        return f"{record.levelname} {record.name}: {safe_message(record)}"
 
 
 def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
@@ -114,7 +144,7 @@ def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
         handler.setFormatter(JsonFormatter())
     else:
         handler.setFormatter(
-            logging.Formatter(
+            SafeTextFormatter(
                 fmt="%(asctime)s %(levelname)s %(name)s: %(message)s",
                 datefmt="%Y-%m-%dT%H:%M:%S%z",
             )

@@ -22,6 +22,8 @@ Transport: Streamable HTTP via FastMCP (current MCP spec).
 from __future__ import annotations
 
 import logging
+import os
+from contextlib import closing
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
@@ -31,7 +33,8 @@ from fastmcp.server.auth.providers.jwt import StaticTokenVerifier
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from mcp_unifi import __version__, telemetry
+from mcp_unifi import __version__, audit, telemetry
+from mcp_unifi.authority import secure_path
 from mcp_unifi.backends import (
     AccessBackend,
     AccessRealBackend,
@@ -106,6 +109,11 @@ def build_server(
             controller's Access backend. Mirrors ``protect`` for the Access
             module.
     """
+    if (
+        settings.mcp_transport == "stdio"
+        and os.environ.get("MCP_UNIFI_AUDIT_SINK", "").strip().lower() == "stdout"
+    ):
+        raise ValueError("stdout audit is incompatible with stdio MCP")
     stub_overrides: dict[str, Backend] | None = (
         {"default": StubBackend(stub)} if stub is not None else None
     )
@@ -158,6 +166,27 @@ def build_server(
         200 status code, not the body, so the JSON shape is safe.
         """
         return JSONResponse({"status": "ok", "version": _resolve_version()})
+
+    @mcp.custom_route("/ready", methods=["GET"])
+    async def ready(_request: Request) -> JSONResponse:
+        log = audit.get_audit_log()
+        await log.emit("local", "readiness", {}, None, True, 0)
+        authority = registry.authority
+        healthy = log.healthy and authority is not None and authority.healthy
+        if healthy and not settings.stub_mode and not settings.readonly:
+            try:
+                if authority is None or authority.grants is None or not authority.scopes:
+                    healthy = False
+                else:
+                    secure_path(authority.grants, directory=True)
+                    with closing(authority._connection()):
+                        pass
+            except Exception:
+                healthy = False
+        return JSONResponse(
+            {"status": "ready" if healthy else "unavailable", "version": _resolve_version()},
+            status_code=200 if healthy else 503,
+        )
 
     register_modules(mcp, settings, registry)
     _install_scope_middleware(mcp, settings)
@@ -273,8 +302,8 @@ SESSION_IDLE_TIMEOUT = 1800.0
 def main() -> None:
     """CLI entrypoint. Dispatches on MCP_TRANSPORT.
 
-    - ``streamable-http`` (default): long-running container / multi-client.
-    - ``stdio``: per-session subprocess (Claude Desktop, ``uvx mcp-unifi``).
+    - ``streamable-http``: long-running container / multi-client.
+    - ``stdio`` (default): per-session subprocess (Claude Desktop, ``uvx mcp-unifi``).
     """
     if fastmcp.settings.http_session_idle_timeout is None:
         fastmcp.settings.http_session_idle_timeout = SESSION_IDLE_TIMEOUT

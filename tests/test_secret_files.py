@@ -98,7 +98,7 @@ def test_file_wins_when_both_forms_are_set(key_file: Path) -> None:
 
 def test_inline_value_keeps_the_adr_0003_default() -> None:
     c = ControllerConfig(name="lan", host="192.168.1.1", api_key=SecretStr("inline"))
-    assert c.verify_ssl is False
+    assert c.verify_ssl is True
     assert c.api_key_file is None
 
 
@@ -175,7 +175,7 @@ def test_access_and_console_password_files_resolve_and_win(tmp_path: Path) -> No
     assert c.os_password is not None
     assert c.os_password.get_secret_value() == OS_PASSWORD
     # The Network key came inline, so the TLS default did not move.
-    assert c.verify_ssl is False
+    assert c.verify_ssl is True
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ def test_legacy_env_value_keeps_the_adr_0003_default(monkeypatch: pytest.MonkeyP
     monkeypatch.setenv("UNIFI_API_KEY", "inline")
     c = Settings().controllers[0]
     assert c.api_key.get_secret_value() == "inline"
-    assert c.verify_ssl is False
+    assert c.verify_ssl is True
 
 
 def test_legacy_env_file_wins_over_value(monkeypatch: pytest.MonkeyPatch, key_file: Path) -> None:
@@ -262,7 +262,7 @@ def test_yaml_mixes_both_shapes(tmp_path: Path, key_file: Path) -> None:
     )
     s = Settings(stub_mode=False, controllers_file=yaml_path)
     lan, dc = s.controllers
-    assert lan.verify_ssl is False
+    assert lan.verify_ssl is True
     assert lan.api_key.get_secret_value() == "inline-lan-key"
     assert dc.verify_ssl is True
     assert dc.api_key.get_secret_value() == API_KEY
@@ -286,7 +286,7 @@ def test_stub_mode_is_unchanged() -> None:
     c = Settings().controllers[0]
     assert c.api_key.get_secret_value() == "stub"
     assert c.api_key_file is None
-    assert c.verify_ssl is False
+    assert c.verify_ssl is True
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ def test_stub_mode_is_unchanged() -> None:
 
 def test_bare_token_file_named_by_client_id(tmp_path: Path) -> None:
     token_file = _write(tmp_path, "token", f"{BEARER}\n")
-    s = Settings(auth_token_file=token_file, client_id="taltos")
+    s = Settings(auth_token_file=token_file, client_id="taltos", mcp_transport="streamable-http")
     assert s.auth_token_map == {BEARER: {"client_id": "taltos", "scopes": []}}
     assert s.auth_client_scopes == {"taltos": {"*"}}
 
@@ -351,21 +351,23 @@ def test_client_id_with_delimiter_is_rejected(tmp_path: Path) -> None:
 
 
 def test_missing_token_file_fails_startup(tmp_path: Path) -> None:
-    s = Settings(auth_token_file=tmp_path / "absent", client_id="x")
+    s = Settings(
+        auth_token_file=tmp_path / "absent", client_id="x", mcp_transport="streamable-http"
+    )
     with pytest.raises(ValueError, match=r"MCP_UNIFI_AUTH_TOKEN_FILE.*does not exist"):
         build_server(s)
 
 
 def test_empty_token_file_fails_startup(tmp_path: Path) -> None:
     token_file = _write(tmp_path, "token", "\n")
-    s = Settings(auth_token_file=token_file, client_id="x")
+    s = Settings(auth_token_file=token_file, client_id="x", mcp_transport="streamable-http")
     with pytest.raises(ValueError, match=r"MCP_UNIFI_AUTH_TOKEN_FILE.*is empty"):
         build_server(s)
 
 
 def test_http_boots_on_a_file_token_alone(tmp_path: Path) -> None:
     token_file = _write(tmp_path, "token", BEARER)
-    s = Settings(auth_token_file=token_file, client_id="taltos")
+    s = Settings(auth_token_file=token_file, client_id="taltos", mcp_transport="streamable-http")
     assert s.mcp_transport == "streamable-http"
     assert s.auth_required is True
     build_server(s)
@@ -453,7 +455,7 @@ def test_legacy_controller_is_named_exactly_once(caplog: pytest.LogCaptureFixtur
     msg = warnings[0].getMessage()
     assert "controller 'default'" in msg
     assert "API key supplied as a value" in msg
-    assert "TLS verification off" in msg
+    assert "TLS verification off" not in msg
     assert ADR_0007 in msg
     assert "\n" not in msg
 
@@ -544,8 +546,8 @@ def test_return_value_counts_the_lines(key_file: Path, caplog: pytest.LogCapture
             ControllerConfig(name="old", host="10.0.0.1", api_key=SecretStr("inline2")),
         ],
     )
-    assert log_legacy_shape_warnings(s) == 3
-    assert len(_config_warnings(caplog)) == 3
+    assert log_legacy_shape_warnings(s) == 2
+    assert len(_config_warnings(caplog)) == 2
 
 
 # ---------------------------------------------------------------------------

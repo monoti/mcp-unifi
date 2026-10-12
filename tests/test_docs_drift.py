@@ -215,14 +215,7 @@ def test_no_stale_test_counts() -> None:
 # Test 3: every documented `docker run mcp-unifi` command carries a token
 # ---------------------------------------------------------------------------
 
-# Match ``docker run ... ghcr.io/pete-builds/mcp-unifi[:tag]`` blocks across
-# multiple lines. The HTTP transport refuses to start without auth; a
-# docker-run example that omits the token teaches users a command that
-# cannot work.
-_DOCKER_RUN_RE = re.compile(
-    r"docker\s+run(?:[^\n]*\\\s*\n[^\n]*)*[^\n]*"
-    r"ghcr\.io/pete-builds/mcp-unifi(?::[^\s]+)?",
-)
+_DOCKER_RUN_RE = re.compile(r"docker\s+run[^\n]*(?:\n[ \t]+[^\n]*)*")
 
 
 def test_docker_run_examples_carry_auth_token() -> None:
@@ -242,6 +235,8 @@ def test_docker_run_examples_carry_auth_token() -> None:
         text = path.read_text(encoding="utf-8")
         for match in _DOCKER_RUN_RE.finditer(text):
             block = match.group(0)
+            if "mcp-unifi" not in block:
+                continue
             has_token = "MCP_UNIFI_AUTH_TOKENS" in block
             has_optout = "MCP_UNIFI_AUTH_REQUIRED=false" in block
             if has_token or has_optout:

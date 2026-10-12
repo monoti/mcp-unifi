@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -64,7 +65,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.list_wlans()))
         except UniFiError as exc:
             logger.exception("list_wlans failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_ap_groups", mutates=False)
@@ -92,7 +93,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_ap_groups())
         except UniFiError as exc:
             logger.exception("list_ap_groups failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("create_wlan", mutates=True)
@@ -154,7 +155,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             backend = resolve_backend(registry, controller)
         except UniFiError as exc:
             logger.exception("create_wlan failed", extra={"wlan_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
         resolved_groups: list[str] = list(ap_group_ids) if ap_group_ids else []
         if not resolved_groups:
@@ -193,7 +194,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.create_wlan(payload)))
         except UniFiError as exc:
             logger.exception("create_wlan failed", extra={"wlan_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_wlan", mutates=True)
@@ -267,7 +268,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("update_wlan failed", extra={"wlan_id": wlan_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_wlan", mutates=True)
@@ -314,7 +315,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             wlans = await backend.list_wlans()
         except UniFiError as exc:
             logger.exception("delete_wlan preview lookup failed", extra={"wlan_id": wlan_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next((w for w in wlans if isinstance(w, dict) and w.get("_id") == wlan_id), None)
         if target is None:
@@ -333,7 +334,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "wlan_id": wlan_id})
             except UniFiError as exc:
                 logger.exception("delete_wlan failed", extra={"wlan_id": wlan_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_wlan",

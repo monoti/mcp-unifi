@@ -423,7 +423,7 @@ def test_pinned_controller_verifies_by_default(console: Console) -> None:
 
 def test_unpinned_controller_passes_the_plain_flag() -> None:
     c = ControllerConfig(name="lan", host="h", api_key=SecretStr("k"))
-    assert c.tls_verify is False
+    assert c.tls_verify is True
     assert c.pinned_cert_sha256 is None
     assert ControllerConfig(name="x", host="h", api_key=SecretStr("k"), verify_ssl=True).tls_verify
 
@@ -501,7 +501,13 @@ def test_pinned_controller_does_not_warn_about_tls(
 
 def test_unpinned_warning_names_the_pin_command(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.WARNING)
-    s = Settings(stub_mode=False, unifi_host="h", unifi_api_key="k", mcp_transport="stdio")
+    s = Settings(
+        stub_mode=False,
+        unifi_host="h",
+        unifi_api_key="k",
+        unifi_verify_ssl=False,
+        mcp_transport="stdio",
+    )
     build_server(s)
     (msg,) = [r.getMessage() for r in caplog.records if r.name == "mcp_unifi.config"]
     assert tls.PIN_COMMAND in msg
@@ -670,14 +676,8 @@ def _env_example_active_lines() -> dict[str, str]:
 def test_env_example_boots_with_the_pin_uncommented(
     monkeypatch: pytest.MonkeyPatch, console: Console
 ) -> None:
-    """Copy the template, fill the two blanks, uncomment the pin: it must start.
-
-    The template shipped ``UNIFI_VERIFY_SSL=false`` as an active line while
-    telling the reader to uncomment ``UNIFI_PINNED_CERT``, which the
-    contradiction check refuses. Found by an outside review of #158.
-    """
     active = _env_example_active_lines()
-    assert "UNIFI_VERIFY_SSL" not in active, "template sets verify_ssl explicitly"
+    assert active["UNIFI_VERIFY_SSL"] == "true"
     for key in set(active) | {"UNIFI_PINNED_CERT", "UNIFI_VERIFY_SSL", "UNIFI_API_KEY_FILE"}:
         monkeypatch.delenv(key, raising=False)
     for key, value in active.items():

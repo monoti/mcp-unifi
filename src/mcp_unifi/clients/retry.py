@@ -90,9 +90,12 @@ async def request_with_retry(
             logger=logger, service="UniFi", error_cls=UniFiError,
         )
     """
+    from mcp_unifi.authority import before_request
+
     connect_retried = False
     fivexx_attempt = 0
     while True:
+        await before_request(client, method, url)
         try:
             resp = await client.request(method, url, json=json)
         except httpx.ConnectError as exc:
@@ -107,27 +110,27 @@ async def request_with_retry(
                 logger.warning(
                     "%s connection error, retrying once",
                     service,
-                    extra={"method": method, "url": url, "error": str(exc)},
+                    extra={"method": method, "error_type": type(exc).__name__},
                 )
                 continue
-            raise error_cls(f"{service} connection failed: {exc}") from exc
+            raise error_cls(f"{service} connection failed: {type(exc).__name__}") from exc
         except httpx.RemoteProtocolError as exc:
             if method.upper() == "GET" and not connect_retried:
                 connect_retried = True
                 logger.warning(
                     "%s connection dropped mid-request, retrying idempotent read once",
                     service,
-                    extra={"method": method, "url": url, "error": str(exc)},
+                    extra={"method": method, "error_type": type(exc).__name__},
                 )
                 continue
             if method.upper() != "GET":
                 raise error_cls(
                     f"{service} connection dropped after {method} was sent; not retried "
-                    f"because the controller may already have applied it: {exc}"
+                    f"because the controller may already have applied it: {type(exc).__name__}"
                 ) from exc
-            raise error_cls(f"{service} connection failed: {exc}") from exc
+            raise error_cls(f"{service} connection failed: {type(exc).__name__}") from exc
         except httpx.HTTPError as exc:
-            raise error_cls(f"{service} transport error: {exc}") from exc
+            raise error_cls(f"{service} transport error: {type(exc).__name__}") from exc
 
         if _is_retryable_5xx(method, resp.status_code) and fivexx_attempt < MAX_5XX_RETRIES:
             delay = BACKOFF_BASE_SECONDS * (2**fivexx_attempt)
@@ -139,7 +142,7 @@ async def request_with_retry(
                 delay,
                 fivexx_attempt + 1,
                 MAX_5XX_RETRIES,
-                extra={"url": url, "status": resp.status_code},
+                extra={"status": resp.status_code},
             )
             fivexx_attempt += 1
             await asyncio.sleep(delay)

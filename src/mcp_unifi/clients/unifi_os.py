@@ -175,7 +175,7 @@ class UniFiOSClient:
         port: int = 443,
         username: str = "",
         password: str = "",
-        verify_ssl: bool | ssl.SSLContext = False,
+        verify_ssl: bool | ssl.SSLContext = True,
         timeout: float = 10.0,
     ) -> None:
         self.host = host
@@ -231,7 +231,7 @@ class UniFiOSClient:
                 return ProbeResult(path, error=tls.SHORT_VERIFY_HINT)
             # Class name, not str(exc) — httpx embeds the full URL in some
             # messages and the API key never belongs in a log line.
-            return ProbeResult(path, error=f"{type(exc).__name__}: {exc!s}"[:200])
+            return ProbeResult(path, error=type(exc).__name__)
         body: Any = None
         if resp.content:
             try:

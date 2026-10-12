@@ -19,7 +19,7 @@ import urllib.request
 def check() -> int:
     """Return 0 if the server is healthy, 1 otherwise. Pure function for tests."""
     port = os.getenv("MCP_PORT", "3714")
-    url = f"http://localhost:{port}/health"
+    url = f"http://localhost:{port}/ready"
     try:
         with urllib.request.urlopen(url, timeout=5) as resp:
             return 0 if resp.status == 200 else 1

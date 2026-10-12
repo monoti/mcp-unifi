@@ -24,6 +24,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -99,7 +100,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_cameras())
         except UniFiError as exc:
             logger.exception("list_cameras failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_camera", mutates=False)
@@ -127,7 +128,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(cam)
         except UniFiError as exc:
             logger.exception("get_camera failed", extra={"camera_id": camera_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_motion_events", mutates=False)
@@ -163,7 +164,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(events)
         except UniFiError as exc:
             logger.exception("list_motion_events failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_smart_detections", mutates=False)
@@ -206,7 +207,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(filtered)
         except UniFiError as exc:
             logger.exception("list_smart_detections failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_snapshot", mutates=False)
@@ -241,7 +242,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("get_snapshot failed", extra={"camera_id": camera_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_event_thumbnail", mutates=False)
@@ -276,7 +277,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             )
         except UniFiError as exc:
             logger.exception("get_event_thumbnail failed", extra={"event_id": event_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_recordings", mutates=False)
@@ -307,7 +308,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_recordings(camera_id, start_ms, end_ms))
         except UniFiError as exc:
             logger.exception("list_recordings failed", extra={"camera_id": camera_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("set_camera_recording_mode", mutates=True)
@@ -355,7 +356,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("set_camera_recording_mode failed", extra={"camera_id": camera_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("set_camera_privacy_mode", mutates=True)
@@ -405,7 +406,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("set_camera_privacy_mode failed", extra={"camera_id": camera_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("set_motion_sensitivity", mutates=True)
@@ -456,7 +457,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("set_motion_sensitivity failed", extra={"camera_id": camera_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_doorbell_messages", mutates=False)
@@ -491,7 +492,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(doorbells)
         except UniFiError as exc:
             logger.exception("list_doorbell_messages failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("provision_camera", mutates=True)
@@ -585,7 +586,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "provision_camera: snapshot fetch failed", extra={"camera_id": camera_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
         # Capture the original sub-settings so rollback restores byte-identical
         # nested state, not just "the keys we touched." (Privacy isn't

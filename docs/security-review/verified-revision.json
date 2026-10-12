@@ -1,0 +1,6 @@
+{
+  "source_commit": "44a48fba74cdf415357e62162849c4deb05c40b9",
+  "upstream_commit": "b9870c768362d5e5b1321c7048a9fc7c035a9c59",
+  "evidence_mode": "isolated synthetic MCP and host-platform artifact checks",
+  "later_commits": "Publication adds evidence and review documentation. Follow-up changes standardize the image name, keep audit artifacts local, restore environment guidance, and refresh dependency locks. The recorded results apply to source_commit; rerun checks for newer revisions."
+}

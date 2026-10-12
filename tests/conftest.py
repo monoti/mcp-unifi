@@ -92,7 +92,7 @@ def stub_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[Settings]:
         monkeypatch.delenv(var, raising=False)
     # auth_required defaults to True in v0.9.0+; tests that don't exercise
     # auth want a server that boots cleanly without tokens.
-    yield Settings(stub_mode=True, log_format="text", auth_required=False)
+    yield Settings(stub_mode=True, log_format="text", auth_required=False, readonly=False)
 
 
 @pytest.fixture
@@ -125,4 +125,5 @@ def real_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[Settings]:
         unifi_api_key="test-api-key-1234",
         log_format="text",
         auth_required=False,
+        readonly=False,
     )

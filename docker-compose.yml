@@ -6,26 +6,28 @@ x-logging: &default-logging
 
 services:
   mcp-unifi:
-    image: ghcr.io/pete-builds/mcp-unifi:0.25.0
+    image: mcp-unifi:0.25.0
+    build: .
+    user: "${MCP_UID:-1000}:${MCP_GID:-1000}"
     container_name: mcp-unifi
     restart: unless-stopped
     read_only: true
     tmpfs:
       - /tmp:size=16M
     ports:
-      - "${MCP_PORT:-3714}:${MCP_PORT:-3714}"
+      - "127.0.0.1:${MCP_PORT:-3714}:${MCP_PORT:-3714}"
     env_file:
       - .env
     environment:
       MCP_TRANSPORT: "streamable-http"
       MCP_HOST: "0.0.0.0"
       MCP_PORT: "${MCP_PORT:-3714}"
+      MCP_UNIFI_READONLY: "true"
+      UNIFI_VERIFY_SSL: "true"
+      MCP_UNIFI_AUDIT_SINK: "file"
+      MCP_UNIFI_AUDIT_PATH: "/var/lib/mcp-unifi/private/audit.jsonl"
+      MCP_UNIFI_MUTATION_JOURNAL: "/var/lib/mcp-unifi/private/mutations.sqlite"
       TZ: "${TZ:-UTC}"
-      # File-backed secrets (opt-in). Uncomment these two lines and the
-      # `secrets:` blocks below, then leave UNIFI_API_KEY and
-      # MCP_UNIFI_AUTH_TOKENS out of .env. A controller configured by
-      # UNIFI_API_KEY_FILE verifies TLS by default; set UNIFI_VERIFY_SSL=false
-      # in .env if the console still has its self-signed certificate.
       # UNIFI_API_KEY_FILE: /run/secrets/unifi_api_key
       # MCP_UNIFI_AUTH_TOKEN_FILE: /run/secrets/mcp_unifi_token
       # MCP_UNIFI_CLIENT_ID: admin
@@ -39,6 +41,8 @@ services:
     # environment:
     #   UNIFI_PINNED_CERT: /etc/mcp-unifi/pins/home.pem
     logging: *default-logging
+    volumes:
+      - mcp-unifi-audit:/var/lib/mcp-unifi
     healthcheck:
       test: ["CMD", "python", "-m", "mcp_unifi.healthcheck"]
       interval: 30s
@@ -47,6 +51,9 @@ services:
       start_period: 10s
     security_opt:
       - no-new-privileges:true
+
+volumes:
+  mcp-unifi-audit:
 
 # One file per secret, mode 0400, outside the repo. Docker mounts each at
 # /run/secrets/<name> inside the container.

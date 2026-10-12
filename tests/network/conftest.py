@@ -12,7 +12,9 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
+import httpx
 import pytest
+import respx
 from fastmcp import FastMCP
 
 from mcp_unifi.clients.stubs import StubState, make_stub_state
@@ -52,6 +54,8 @@ async def real_server(real_settings: Settings) -> AsyncIterator[FastMCP]:
         site=default_ctrl.site,
         verify_ssl=default_ctrl.verify_ssl,
     )
+    client._client._transport = httpx.MockTransport(respx.mock.async_handler)
+    client._client._mounts.clear()
     server = build_server(real_settings, unifi=client)
     yield server
     await client.aclose()

@@ -27,6 +27,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -80,7 +81,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_traffic_rules())
         except UniFiError as exc:
             logger.exception("list_traffic_rules failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_traffic_rule_details", mutates=False)
@@ -105,7 +106,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             target = await _find_traffic_rule(backend, rule_id)
         except UniFiError as exc:
             logger.exception("get_traffic_rule_details failed", extra={"rule_id": rule_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if target is None:
             return err(f"traffic rule {rule_id} not found")
         return format_json(target)
@@ -163,7 +164,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_traffic_rule(rule))
         except UniFiError as exc:
             logger.exception("create_traffic_rule failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_traffic_rule", mutates=True)
@@ -200,7 +201,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             existing = await _find_traffic_rule(backend, rule_id)
         except UniFiError as exc:
             logger.exception("update_traffic_rule lookup failed", extra={"rule_id": rule_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if existing is None:
             return err(f"traffic rule {rule_id} not found")
         merged = {**existing, **updates}
@@ -220,7 +221,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("update_traffic_rule failed", extra={"rule_id": rule_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("toggle_traffic_rule", mutates=True)
@@ -256,7 +257,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             existing = await _find_traffic_rule(backend, rule_id)
         except UniFiError as exc:
             logger.exception("toggle_traffic_rule lookup failed", extra={"rule_id": rule_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if existing is None:
             return err(f"traffic rule {rule_id} not found")
         if dry_run:
@@ -282,7 +283,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("toggle_traffic_rule failed", extra={"rule_id": rule_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     # ------------------------------------------------------------------
     # Traffic routes (policy-based routing)
@@ -311,7 +312,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_traffic_routes())
         except UniFiError as exc:
             logger.exception("list_traffic_routes failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_traffic_route_details", mutates=False)
@@ -336,7 +337,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             target = await _find_traffic_route(backend, route_id)
         except UniFiError as exc:
             logger.exception("get_traffic_route_details failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if target is None:
             return err(f"traffic route {route_id} not found")
         return format_json(target)
@@ -389,7 +390,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             existing = await _find_traffic_route(backend, route_id)
         except UniFiError as exc:
             logger.exception("update_traffic_route lookup failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if existing is None:
             return err(f"traffic route {route_id} not found")
         merged = {**existing, **patch}
@@ -409,7 +410,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("update_traffic_route failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("toggle_traffic_route", mutates=True)
@@ -445,7 +446,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             existing = await _find_traffic_route(backend, route_id)
         except UniFiError as exc:
             logger.exception("toggle_traffic_route lookup failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if existing is None:
             return err(f"traffic route {route_id} not found")
         if dry_run:
@@ -471,7 +472,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("toggle_traffic_route failed", extra={"route_id": route_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
 
 __all__ = ["register"]

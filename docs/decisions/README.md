@@ -15,8 +15,8 @@ accepted costs**. A decision with no downside listed has not been examined.
 |---|---|---|
 | [0001](0001-explicit-write-classification.md) | Classify tools as mutating by explicit declaration, not by name prefix | Accepted |
 | [0002](0002-shared-substrate-stays-off-pypi.md) | Keep the shared MCP substrate off PyPI | Accepted (fleet-level; this repo is not a consumer) |
-| [0003](0003-verify-ssl-defaults-off.md) | `verify_ssl` defaults to `false` | Accepted |
-| [0004](0004-confirm-token-is-ceremony-not-consent.md) | The confirm-token handshake is ceremony, not consent | Interim control, known inadequate |
+| [0003](0003-verify-ssl-defaults-off.md) | `verify_ssl` defaults to `false` | Superseded in this fork |
+| [0004](0004-confirm-token-is-ceremony-not-consent.md) | The confirm-token handshake is ceremony, not consent | Supplemented by external exact grants in this fork |
 | [0005](0005-writes-stay-on-the-private-network-api.md) | Writes stay on the private UniFi Network API | Accepted, with an outstanding documentation task |
 | [0006](0006-denied-by-is-a-separate-audit-field.md) | `denied_by` is a separate audit field, not a convention on `error` | Accepted |
 | [0007](0007-hardening-is-opt-in-unless-the-hole-has-no-legitimate-configuration.md) | Hardening that narrows a working install is opt-in; hardening that closes a hole with no legitimate configuration is mandatory | Accepted |
@@ -56,3 +56,5 @@ check it later without asking the author.
 - Claims are verified against the code at the time of writing. Where something
   could not be verified, the record says so rather than implying a verification
   that did not happen.
+
+This fork supersedes the defaults and opt-in policy in ADRs 0003 and 0007. See [Operating the hardened fork](../hardening-operations.md) for the current authority and deployment contract.

@@ -127,6 +127,7 @@ from typing import Any
 #: Add a pattern only when it names a value, never a reference.
 SENSITIVE_KEY_PATTERNS: frozenset[str] = frozenset(
     {
+        "backup_json",
         "passphrase",
         "x_passphrase",
         "api_key",

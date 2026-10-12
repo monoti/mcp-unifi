@@ -45,7 +45,7 @@ def _serialise_tool(tool: Any) -> dict[str, Any]:
 async def _collect() -> list[dict[str, Any]]:
     # stdio transport bypasses the HTTP auth gate; this introspection-only
     # script never serves traffic.
-    settings = Settings(stub_mode=True, log_format="text", mcp_transport="stdio")
+    settings = Settings(readonly=False, stub_mode=True, log_format="text", mcp_transport="stdio")
     server = build_server(settings)
     tools_obj = await server.list_tools()
     tools_iter = tools_obj.values() if isinstance(tools_obj, dict) else tools_obj

@@ -1,0 +1,10 @@
+{
+  "audit_error_contains_secret": false,
+  "json_chained_contains_secret": false,
+  "json_mapping_contains_secret": false,
+  "json_serialized_contains_secret": false,
+  "text_chained_contains_secret": false,
+  "text_mapping_contains_secret": false,
+  "text_serialized_contains_secret": false,
+  "unexpected_domain_error_contains_secret": false
+}

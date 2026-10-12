@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -50,7 +51,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_port_profiles())
         except UniFiError as exc:
             logger.exception("list_port_profiles failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=CREATE)
     @audited("create_port_profile", mutates=True)
@@ -112,7 +113,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.create_port_profile(payload))
         except UniFiError as exc:
             logger.exception("create_port_profile failed", extra={"profile_name": name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_port_profile", mutates=True)
@@ -164,7 +165,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(updated)
         except UniFiError as exc:
             logger.exception("update_port_profile failed", extra={"profile_id": profile_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_port_profile", mutates=True)
@@ -212,7 +213,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             logger.exception(
                 "delete_port_profile preview lookup failed", extra={"profile_id": profile_id}
             )
-            return err(str(exc))
+            return err(safe_error(exc))
 
         target = next(
             (p for p in profiles if isinstance(p, dict) and p.get("_id") == profile_id), None
@@ -232,7 +233,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "profile_id": profile_id})
             except UniFiError as exc:
                 logger.exception("delete_port_profile failed", extra={"profile_id": profile_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_port_profile",

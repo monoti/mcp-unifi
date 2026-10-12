@@ -142,7 +142,7 @@ async def test_every_callable_tool_redacts_secret_shaped_keys(
             if not attr.startswith("_"):
                 _inject(val)
 
-    settings = Settings(stub_mode=True, log_format="text", auth_required=False)
+    settings = Settings(readonly=False, stub_mode=True, log_format="text", auth_required=False)
     server: FastMCP = build_server(
         settings, stub=stub_state, protect_stub=protect_state, access_stub=access_state
     )

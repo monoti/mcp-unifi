@@ -86,6 +86,7 @@ def real_protect_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[Settings]
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("MCP_UNIFI_MODULES_ENABLED", "protect")
     yield Settings(
+        readonly=False,
         stub_mode=False,
         log_format="text",
         auth_required=False,
@@ -105,6 +106,8 @@ async def real_protect_server(
     real_protect_settings: Settings,
 ) -> AsyncIterator[FastMCP]:
     client = ProtectClient(host="gateway.test", api_key="test-api-key-real", port=443)
+    client._client._transport = httpx.MockTransport(respx.mock.async_handler)
+    client._client._mounts.clear()
     server = build_server(real_protect_settings, protect=client)
     yield server
     await client.aclose()
@@ -343,6 +346,8 @@ async def test_real_list_doorbell_messages_500(real_protect_server: FastMCP) -> 
 async def test_client_retries_on_connect_error() -> None:
     """One ConnectError gets retried; the second attempt succeeds."""
     client = ProtectClient(host="gateway.test", api_key="k", port=443)
+    client._client._transport = httpx.MockTransport(respx.mock.async_handler)
+    client._client._mounts.clear()
     try:
         # respx side_effect runs in order: first raises, second returns 200.
         route = respx.get(f"{PROTECT_BASE}/cameras").mock(
@@ -483,6 +488,8 @@ async def test_client_get_snapshot_http_error_wraps() -> None:
 @respx.mock
 async def test_client_update_camera_patch() -> None:
     client = ProtectClient(host="gateway.test", api_key="k", port=443)
+    client._client._transport = httpx.MockTransport(respx.mock.async_handler)
+    client._client._mounts.clear()
     try:
         respx.patch(f"{PROTECT_BASE}/cameras/c1").mock(
             return_value=httpx.Response(200, json={"id": "c1", "name": "Updated"})
@@ -604,6 +611,8 @@ async def test_real_list_events_rejects_unsafe_event_type() -> None:
         return_value=httpx.Response(200, json=[])
     )
     client = ProtectClient(host="gateway.test", api_key="test-api-key-real", port=443)
+    client._client._transport = httpx.MockTransport(respx.mock.async_handler)
+    client._client._mounts.clear()
     try:
         with pytest.raises(UniFiError, match="event_type"):
             await client.list_events(["motion&limit=100000"], 0, 1, 10)

@@ -255,7 +255,7 @@ async def test_provision_camera_snapshot_fetch_failure(
 
     result = await _call(protect_registry, "provision_camera", {"camera_id": cam_id})
     assert "error" in result
-    assert "snapshot fetch" in result["error"]
+    assert result["error"] == "Operation failed (UniFiError)."
 
 
 async def test_provision_camera_rollback_recording_restore_fails(

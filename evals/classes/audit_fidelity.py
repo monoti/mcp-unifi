@@ -99,12 +99,6 @@ async def _write_record_matches_state(session: HarnessSession) -> CaseResult:
 
 
 async def _error_envelope_is_logged_as_a_dispatch(session: HarnessSession) -> CaseResult:
-    """A controller-side error is a completed dispatch carrying an error result.
-
-    Pinned deliberately. ``success`` answers "did the tool body raise", not
-    "did the caller get what they wanted", and the difference matters to anyone
-    counting failures out of this log.
-    """
     case = "error_envelope_is_logged_as_a_dispatch"
     payload = payload_of(
         await session.client.call_tool("get_network_details", {"network_id": "no-such-id"})
@@ -117,7 +111,7 @@ async def _error_envelope_is_logged_as_a_dispatch(session: HarnessSession) -> Ca
     logged = record.get("result")
     if not isinstance(logged, dict) or logged.get("error") != payload["error"]:
         return CaseResult(case, False, "result_mismatch", "the error text was not recorded")
-    if record.get("success") is not True or record.get("denied_by") is not None:
+    if record.get("success") is not False or record.get("denied_by") is not None:
         return CaseResult(case, False, "wrong_envelope", "dispatch classification changed")
     return CaseResult(case, True, "match", "error text recorded, dispatch classified unchanged")
 

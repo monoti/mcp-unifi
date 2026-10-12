@@ -1,3 +1,11 @@
+{{- if not .Values.readOnly }}
+{{- if or (not .Values.audit.existingClaim) (not .Values.authority.approvalClaim) (not .Values.authority.controllerScopes) }}
+{{- fail "Writable mode requires persistent audit and read-only approval claims plus controllerScopes." }}
+{{- end }}
+{{- if ne (int .Values.replicaCount) 1 }}
+{{- fail "Writable mode requires one replica and a local durable SQLite volume." }}
+{{- end }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,12 +26,18 @@ spec:
       labels:
         {{- include "mcp-unifi.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if and (or .Values.audit.existingClaim .Values.authority.approvalClaim) (hasKey .Values.podSecurityContext "fsGroup") }}
+      {{- fail "Persistent private storage must be owner-provisioned without fsGroup permission rewriting." }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- if and (not .Values.audit.existingClaim) (not .Values.authority.approvalClaim) }}
+        fsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -57,6 +71,18 @@ spec:
               value: {{ .Values.auth.required | quote }}
             - name: MCP_UNIFI_READONLY
               value: {{ .Values.readOnly | quote }}
+            - name: MCP_UNIFI_AUDIT_SINK
+              value: "file"
+            - name: MCP_UNIFI_AUDIT_PATH
+              value: "/var/lib/mcp-unifi/private/audit.jsonl"
+            - name: MCP_UNIFI_MUTATION_JOURNAL
+              value: "/var/lib/mcp-unifi/private/mutations.sqlite"
+            - name: MCP_UNIFI_CONTROLLER_SCOPES
+              value: {{ .Values.authority.controllerScopes | toJson | quote }}
+            {{- if .Values.authority.approvalClaim }}
+            - name: MCP_UNIFI_APPROVAL_DIR
+              value: "/etc/mcp-unifi/approvals"
+            {{- end }}
             {{- if or .Values.existingSecret .Values.unifi.apiKey }}
             - name: UNIFI_API_KEY
               valueFrom:
@@ -85,7 +111,26 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: audit
+              mountPath: /var/lib/mcp-unifi
+            {{- if .Values.authority.approvalClaim }}
+            - name: approvals
+              mountPath: /etc/mcp-unifi/approvals
+              readOnly: true
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 16Mi
+        - name: audit
+          {{- if .Values.audit.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.audit.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.authority.approvalClaim }}
+        - name: approvals
+          persistentVolumeClaim:
+            claimName: {{ .Values.authority.approvalClaim }}
+        {{- end }}

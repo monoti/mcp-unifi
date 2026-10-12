@@ -23,8 +23,7 @@ Every secret (``api_key``, ``access_api_key``, ``os_password``, the HTTP
 bearer tokens) also accepts a file-backed form (``api_key_file`` and so on,
 ``UNIFI_API_KEY_FILE`` / ``MCP_UNIFI_AUTH_TOKEN_FILE`` in the environment) for
 Docker and Kubernetes secret mounts. The value form keeps working; the file
-form is opt-in and, per ADR 0007, carries the hardened defaults inside it: a
-controller configured by ``api_key_file`` verifies TLS unless told not to.
+form is opt-in. Every controller verifies TLS unless explicitly configured otherwise.
 Design credit: the ``_default_tls_policy`` validator in PR #154 by
 @Taltos-ch (Taltos GmbH).
 """
@@ -119,13 +118,11 @@ class ControllerConfig(BaseModel):
     port: int = Field(default=443, ge=1, le=65535)
     site: str = Field(default="default")
     verify_ssl: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "Verify the gateway's TLS certificate. False by default (ADR 0003: "
-            "consoles ship a self-signed certificate for an IP), except that a "
-            "controller configured with api_key_file defaults to true (ADR "
-            "0007). An explicit value always wins over either default. A "
-            "controller with pinned_cert verifies against that pin instead."
+            "Verify the gateway's TLS certificate. Defaults to true for every "
+            "credential source. A controller with pinned_cert verifies against "
+            "that pin instead."
         ),
     )
     pinned_cert: Path | None = Field(
@@ -164,6 +161,17 @@ class ControllerConfig(BaseModel):
         description="Path to a file containing the Access API key. Wins over access_api_key.",
     )
     access_port: int = Field(default=12445, ge=1, le=65535)
+
+    access_pinned_cert: Path | None = Field(
+        default=None,
+        description="Independent PEM certificate pin for the Access hub.",
+    )
+
+    @property
+    def access_tls_verify(self) -> bool | ssl.SSLContext:
+        if self.access_pinned_cert is not None:
+            return tls.build_pinned_context(self.access_pinned_cert, "access_pinned_cert")
+        return self.verify_ssl
 
     # UniFi OS console-session credentials. Separate from ``api_key`` on
     # purpose: the Network API key authenticates the Network application
@@ -216,9 +224,7 @@ class ControllerConfig(BaseModel):
             resolved[file_field] = path
             resolved[value_field] = _read_secret_file(path, f"controller '{name}' {file_field}")
         if resolved.get("verify_ssl") is None:
-            resolved["verify_ssl"] = (
-                resolved.get("api_key_file") is not None or resolved.get("pinned_cert") is not None
-            )
+            resolved["verify_ssl"] = True
         return resolved
 
     @model_validator(mode="after")
@@ -231,6 +237,11 @@ class ControllerConfig(BaseModel):
         two settings name opposite intents and picking one silently is the
         shape ADR 0003 rejects.
         """
+        if self.access_pinned_cert is not None:
+            self.access_pinned_cert = self.access_pinned_cert.expanduser()
+            tls.load_pinned_cert(self.access_pinned_cert, "access_pinned_cert")
+            if not self.verify_ssl:
+                raise ValueError("access_pinned_cert requires verify_ssl=true")
         if self.pinned_cert is None:
             return self
         self.pinned_cert = self.pinned_cert.expanduser()
@@ -293,15 +304,28 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Read-only write gate (v0.21.0+)
     # ------------------------------------------------------------------
+    controller_scopes: dict[str, list[str]] = Field(
+        default_factory=dict,
+        validation_alias=AliasChoices("MCP_UNIFI_CONTROLLER_SCOPES", "controller_scopes"),
+        description="Trusted caller IDs mapped to allowed resolved controller names.",
+    )
+    approval_dir: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MCP_UNIFI_APPROVAL_DIR", "approval_dir"),
+    )
+    mutation_journal: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MCP_UNIFI_MUTATION_JOURNAL", "mutation_journal"),
+    )
     readonly: bool = Field(
-        default=False,
+        default=True,
         validation_alias=AliasChoices("MCP_UNIFI_READONLY", "readonly"),
         description=(
             "If True, every tool that changes state is hidden from tools/list "
             "and refused on tools/call. Defense in depth on top of a read-only "
             "UniFi API key: the key is the authority, this makes the server "
-            "unable to try. Default False so existing deployments are "
-            "unaffected. Env var: MCP_UNIFI_READONLY."
+            "unable to try. Default True; writable operation requires "
+            "explicit opt-in. Env var: MCP_UNIFI_READONLY."
         ),
     )
 
@@ -381,8 +405,8 @@ class Settings(BaseSettings):
     unifi_verify_ssl: bool | None = Field(
         default=None,
         description=(
-            "Legacy verify_ssl. Unset resolves per controller: false, or true "
-            "when UNIFI_API_KEY_FILE is set (ADR 0007). Env var: UNIFI_VERIFY_SSL."
+            "Legacy verify_ssl. Unset resolves to true for every controller. "
+            "Env var: UNIFI_VERIFY_SSL."
         ),
     )
     unifi_protect_api: Literal["internal", "integration"] = Field(default="internal")
@@ -455,14 +479,14 @@ class Settings(BaseSettings):
     # MCP server settings
     # ------------------------------------------------------------------
     mcp_transport: Literal["stdio", "streamable-http"] = Field(
-        default="streamable-http",
+        default="stdio",
         description=(
             "MCP transport. 'stdio' for Claude Desktop / per-session "
             "subprocess installs (uvx, pipx). 'streamable-http' (default) "
             "for the long-running container, multi-client homelab pattern."
         ),
     )
-    mcp_host: str = Field(default="0.0.0.0")
+    mcp_host: str = Field(default="127.0.0.1")
     mcp_port: int = Field(default=3714, ge=1, le=65535)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
     log_format: Literal["json", "text"] = Field(

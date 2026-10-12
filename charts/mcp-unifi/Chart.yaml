@@ -4,9 +4,9 @@ description: MCP server for self-hosted UniFi gateway management (Network + Prot
 type: application
 version: 0.2.11
 appVersion: "0.25.0"
-home: https://github.com/pete-builds/mcp-unifi
+home: https://github.com/monoti/mcp-unifi
 sources:
-  - https://github.com/pete-builds/mcp-unifi
+  - https://github.com/monoti/mcp-unifi
 keywords:
   - mcp
   - unifi

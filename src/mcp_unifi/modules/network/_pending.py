@@ -53,6 +53,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from mcp_unifi.authority import OPERATION, Operation, principal
 from mcp_unifi.modules.network._common import dump_json
 from mcp_unifi.redaction import redact
 
@@ -83,6 +84,9 @@ class PendingAction:
     resource: dict[str, Any]
     expires_at: float
     executor: Callable[[], Awaitable[str]] = field(repr=False)
+
+    issuer: str | None = None
+    intent: Operation | None = field(default=None, repr=False)
 
     def expires_at_iso(self) -> str:
         """Return ``expires_at`` formatted as ISO 8601 UTC."""
@@ -141,6 +145,8 @@ class PendingActionsRegistry:
             resource=resource,
             expires_at=time.time() + self._ttl_seconds,
             executor=executor,
+            issuer=principal(),
+            intent=OPERATION.get(),
         )
         self._actions[token] = pending
         return pending

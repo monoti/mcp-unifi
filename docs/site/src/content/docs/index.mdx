@@ -15,6 +15,9 @@ hero:
       icon: external
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
 `mcp-unifi` is a [Model Context Protocol](https://modelcontextprotocol.io/) server for self-hosted UniFi gateways, built around the assumption that LLM-driven infrastructure calls need guardrails. Every destructive tool ships with a `dry_run` preview that returns the predicted change set without writing. Every call — preview or real — lands in a JSONL audit log with secrets scrubbed. Composite tools (e.g. "create an IoT VLAN with isolation rule") capture pre-state and roll back applied steps if any sub-step fails.
@@ -31,10 +34,12 @@ The HTTP transport refuses to start without a bearer token. All Docker / Helm ex
 
     ```bash
     export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
-    docker run --rm -p 3714:3714 \
-      -e STUB_MODE=true \
+    docker run --rm -p 127.0.0.1:3714:3714 \
+      -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
+  -e STUB_MODE=true \
       -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
-      ghcr.io/pete-builds/mcp-unifi:latest
+      mcp-unifi:0.25.0
     ```
 
     [Docker install guide →](/mcp-unifi/install/docker/)
@@ -65,7 +70,7 @@ The HTTP transport refuses to start without a bearer token. All Docker / Helm ex
     Quick one-off runs straight from GitHub.
 
     ```bash
-    uvx --from git+https://github.com/pete-builds/mcp-unifi mcp-unifi
+    uvx --from /absolute/path/to/reviewed/mcp-unifi mcp-unifi
     ```
 
     [uvx install guide →](/mcp-unifi/install/uvx/)

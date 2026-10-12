@@ -203,7 +203,7 @@ async def test_audit_records_failure_and_reraises(
     ev = events[0]
     assert ev["tool"] == "synthetic_tool"
     assert ev["success"] is False
-    assert ev["error"] == "explosive disassembly"
+    assert ev["error"] == "Operation failed."
     assert ev["result"] is None
     assert ev["args"]["thing"] == "y"
 

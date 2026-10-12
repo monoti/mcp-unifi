@@ -16,11 +16,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
   publish:
+    needs: verify
     name: Build + Push image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
 
       - name: Verify version surfaces match the tag
         # Fail closed: the released artifacts must describe the version their
@@ -109,10 +116,24 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          mkdir -p dist/dxt/bundle
-          python -m pip install --upgrade pip
-          pip install --target dist/dxt/bundle .
-          cp manifest.json dist/dxt/manifest.json
+          python scripts/build_dxt.py dist/dxt
+
+      - name: Scan assembled .dxt bundle
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          scan-type: rootfs
+          scan-ref: dist/dxt
+          vuln-type: library
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Archive scanned .dxt bundle
+        env:
+          VERSION: ${{ steps.dxt.outputs.version }}
+        run: |
+          set -euo pipefail
           cd dist/dxt
           zip -r "../../mcp-unifi-${VERSION}.dxt" .
 

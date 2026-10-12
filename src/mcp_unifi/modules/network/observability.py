@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp_unifi.annotations import ACTION, READ_ONLY
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -44,7 +45,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_site_health())
         except UniFiError as exc:
             logger.exception("get_site_health failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_wan_status", mutates=False)
@@ -68,7 +69,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_wan_status())
         except UniFiError as exc:
             logger.exception("get_wan_status failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_events", mutates=False)
@@ -98,7 +99,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_events(limit))
         except UniFiError as exc:
             logger.exception("list_events failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_alarms", mutates=False)
@@ -134,7 +135,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.list_alarms(limit, archived))
         except UniFiError as exc:
             logger.exception("list_alarms failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=ACTION)
     # Classified mutating even though it changes no configuration: it issues a
@@ -163,7 +164,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.trigger_speedtest())
         except UniFiError as exc:
             logger.exception("trigger_speedtest failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_speedtest_results", mutates=False)
@@ -189,7 +190,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.get_speedtest_results(limit))
         except UniFiError as exc:
             logger.exception("get_speedtest_results failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("list_top_talkers", mutates=False)
@@ -216,4 +217,4 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(await backend.top_talkers(limit))
         except UniFiError as exc:
             logger.exception("list_top_talkers failed")
-            return err(str(exc))
+            return err(safe_error(exc))

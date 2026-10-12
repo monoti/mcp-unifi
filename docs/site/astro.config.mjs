@@ -2,14 +2,14 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
-  site: 'https://pete-builds.github.io',
+  site: 'https://monoti.github.io',
   base: '/mcp-unifi',
   integrations: [
     starlight({
       title: 'mcp-unifi',
       description: 'Self-hosted UniFi MCP server. Multi-site config, dry-run previews, JSONL audit log. Network + Protect + Access.',
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/pete-builds/mcp-unifi' }
+        { icon: 'github', label: 'GitHub', href: 'https://github.com/monoti/mcp-unifi' }
       ],
       sidebar: [
         { label: 'Getting Started', link: '/getting-started/' },
@@ -25,6 +25,7 @@ export default defineConfig({
         {
           label: 'Guides',
           items: [
+            { label: 'Hardened Fork Operations', link: '/guides/hardening/' },
             { label: 'Multi-Site Setup', link: '/guides/multi-site/' },
             { label: 'Access Setup', link: '/guides/access-setup/' },
             { label: 'Dry-Run & Audit Log', link: '/guides/dry-run-audit/' },
@@ -54,7 +55,7 @@ export default defineConfig({
         { label: 'Changelog', link: '/changelog/' },
       ],
       editLink: {
-        baseUrl: 'https://github.com/pete-builds/mcp-unifi/edit/main/docs/site/',
+        baseUrl: 'https://github.com/monoti/mcp-unifi/edit/main/docs/site/',
       },
     }),
   ],

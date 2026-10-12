@@ -204,9 +204,9 @@ async def test_emit_failure_carries_error_string(tmp_path: Path) -> None:
         error="UniFiError: 404 not found",
     )
     assert event.success is False
-    assert event.error == "UniFiError: 404 not found"
+    assert event.error == "Operation failed."
     record = json.loads(sink.path.read_text(encoding="utf-8").splitlines()[0])
-    assert record["error"] == "UniFiError: 404 not found"
+    assert record["error"] == "Operation failed."
 
 
 async def test_emit_creates_parent_directories(tmp_path: Path) -> None:
@@ -446,7 +446,7 @@ async def test_parse_jsonl_round_trips_emitted_events(tmp_path: Path) -> None:
     events = parse_jsonl(target.read_text(encoding="utf-8").splitlines())
     assert len(events) == 2
     assert events[0].tool == "list_devices"
-    assert events[1].error == "not found"
+    assert events[1].error == "Operation failed."
     assert events[1].success is False
 
 

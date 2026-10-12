@@ -24,6 +24,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from mcp_unifi.annotations import CREATE, DESTRUCTIVE, READ_ONLY, WRITE_IDEMPOTENT
+from mcp_unifi.clients.errors import safe_error
 from mcp_unifi.clients.unifi import UniFiError
 from mcp_unifi.dispatcher import resolve_backend
 from mcp_unifi.modules._audit import audited
@@ -79,7 +80,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.list_dynamic_dns()))
         except UniFiError as exc:
             logger.exception("list_dynamic_dns failed")
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=READ_ONLY)
     @audited("get_dynamic_dns_details", mutates=False)
@@ -105,7 +106,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             target = await _find_ddns(backend, ddns_id)
         except UniFiError as exc:
             logger.exception("get_dynamic_dns_details failed", extra={"ddns_id": ddns_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if target is None:
             return err(f"dynamic DNS config {ddns_id} not found")
         return format_json(redact(target))
@@ -178,7 +179,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(await backend.create_dynamic_dns(payload)))
         except UniFiError as exc:
             logger.exception("create_dynamic_dns failed", extra={"host_name": host_name})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=WRITE_IDEMPOTENT)
     @audited("update_dynamic_dns", mutates=True)
@@ -233,7 +234,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             return format_json(redact(updated))
         except UniFiError as exc:
             logger.exception("update_dynamic_dns failed", extra={"ddns_id": ddns_id})
-            return err(str(exc))
+            return err(safe_error(exc))
 
     @mcp.tool(annotations=DESTRUCTIVE)
     @audited("delete_dynamic_dns", mutates=True)
@@ -280,7 +281,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
             target = await _find_ddns(backend, ddns_id)
         except UniFiError as exc:
             logger.exception("delete_dynamic_dns preview lookup failed", extra={"ddns_id": ddns_id})
-            return err(str(exc))
+            return err(safe_error(exc))
         if target is None:
             return err(f"dynamic DNS config {ddns_id} not found")
 
@@ -296,7 +297,7 @@ def register(mcp: FastMCP, settings: Settings, registry: ControllerRegistry) -> 
                 return format_json({"deleted": ok, "ddns_id": ddns_id})
             except UniFiError as exc:
                 logger.exception("delete_dynamic_dns failed", extra={"ddns_id": ddns_id})
-                return err(str(exc))
+                return err(safe_error(exc))
 
         pending = get_pending_actions().put(
             action="delete_dynamic_dns",

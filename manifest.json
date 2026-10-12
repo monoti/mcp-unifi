@@ -11,11 +11,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pete-builds/mcp-unifi.git"
+    "url": "https://github.com/monoti/mcp-unifi.git"
   },
-  "homepage": "https://github.com/pete-builds/mcp-unifi",
-  "documentation": "https://github.com/pete-builds/mcp-unifi#readme",
-  "support": "https://github.com/pete-builds/mcp-unifi/issues",
+  "homepage": "https://github.com/monoti/mcp-unifi",
+  "documentation": "https://github.com/monoti/mcp-unifi#readme",
+  "support": "https://github.com/monoti/mcp-unifi/issues",
   "keywords": [
     "mcp",
     "unifi",

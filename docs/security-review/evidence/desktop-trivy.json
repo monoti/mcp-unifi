@@ -1,0 +1,955 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.70.0"
+  },
+  "ReportID": "01a12b82-3bea-7a7f-9c16-160de2f4da62",
+  "CreatedAt": "2026-10-11T22:08:37.73869+07:00",
+  "ArtifactName": "/private/tmp/unifi-hardening-dxt-final-r5",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "Python",
+      "Class": "lang-pkgs",
+      "Type": "python-pkg",
+      "Packages": [
+        {
+          "Name": "Authlib",
+          "Identifier": {
+            "PURL": "pkg:pypi/authlib@1.8.0",
+            "UID": "a7a6022684d22552"
+          },
+          "Version": "1.8.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/authlib-1.8.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "PyJWT",
+          "Identifier": {
+            "PURL": "pkg:pypi/pyjwt@2.15.1",
+            "UID": "ac2cf0f0058c7770"
+          },
+          "Version": "2.15.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/pyjwt-2.15.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "PyYAML",
+          "Identifier": {
+            "PURL": "pkg:pypi/pyyaml@6.0.3",
+            "UID": "e7ec5d6ad5dc58aa"
+          },
+          "Version": "6.0.3",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/pyyaml-6.0.3.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "Pygments",
+          "Identifier": {
+            "PURL": "pkg:pypi/pygments@2.21.0",
+            "UID": "74b757b3030e907e"
+          },
+          "Version": "2.21.0",
+          "Licenses": [
+            "BSD-2-Clause"
+          ],
+          "FilePath": "bundle/pygments-2.21.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "SecretStorage",
+          "Identifier": {
+            "PURL": "pkg:pypi/secretstorage@3.5.0",
+            "UID": "609aecfa2eabb8ee"
+          },
+          "Version": "3.5.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/secretstorage-3.5.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "aiofile",
+          "Identifier": {
+            "PURL": "pkg:pypi/aiofile@3.12.3",
+            "UID": "f3a594549ff82ac8"
+          },
+          "Version": "3.12.3",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/aiofile-3.12.3.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "annotated-types",
+          "Identifier": {
+            "PURL": "pkg:pypi/annotated-types@0.8.0",
+            "UID": "a485e1d119ae0f50"
+          },
+          "Version": "0.8.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/annotated_types-0.8.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "anyio",
+          "Identifier": {
+            "PURL": "pkg:pypi/anyio@4.15.1",
+            "UID": "4a262dc3ce8f5032"
+          },
+          "Version": "4.15.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/anyio-4.15.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "attrs",
+          "Identifier": {
+            "PURL": "pkg:pypi/attrs@26.1.0",
+            "UID": "5296484bf8ff8a58"
+          },
+          "Version": "26.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/attrs-26.1.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "beartype",
+          "Identifier": {
+            "PURL": "pkg:pypi/beartype@0.22.9",
+            "UID": "9f867fd34e5cea8d"
+          },
+          "Version": "0.22.9",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/beartype-0.22.9.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "cachetools",
+          "Identifier": {
+            "PURL": "pkg:pypi/cachetools@7.2.1",
+            "UID": "183c15e6498cef03"
+          },
+          "Version": "7.2.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/cachetools-7.2.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "caio",
+          "Identifier": {
+            "PURL": "pkg:pypi/caio@0.12.9",
+            "UID": "5fc092d590c8a0fa"
+          },
+          "Version": "0.12.9",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/caio-0.12.9.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "certifi",
+          "Identifier": {
+            "PURL": "pkg:pypi/certifi@2026.7.22",
+            "UID": "f59e44443534965f"
+          },
+          "Version": "2026.7.22",
+          "Licenses": [
+            "MPL-2.0"
+          ],
+          "FilePath": "bundle/certifi-2026.7.22.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "cffi",
+          "Identifier": {
+            "PURL": "pkg:pypi/cffi@2.1.1",
+            "UID": "5c572be427cb6710"
+          },
+          "Version": "2.1.1",
+          "Licenses": [
+            "MIT-0"
+          ],
+          "FilePath": "bundle/cffi-2.1.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "click",
+          "Identifier": {
+            "PURL": "pkg:pypi/click@8.5.0",
+            "UID": "17ff46356165b7a"
+          },
+          "Version": "8.5.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/click-8.5.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "cryptography",
+          "Identifier": {
+            "PURL": "pkg:pypi/cryptography@50.0.2",
+            "UID": "d94b34b7ffaffb"
+          },
+          "Version": "50.0.2",
+          "Licenses": [
+            "Apache-2.0 OR BSD-3-Clause"
+          ],
+          "FilePath": "bundle/cryptography-50.0.2.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "cyclopts",
+          "Identifier": {
+            "PURL": "pkg:pypi/cyclopts@5.2.0",
+            "UID": "a0617853d99df503"
+          },
+          "Version": "5.2.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/cyclopts-5.2.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "dnspython",
+          "Identifier": {
+            "PURL": "pkg:pypi/dnspython@2.9.0",
+            "UID": "3e45247ced6653cb"
+          },
+          "Version": "2.9.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "FilePath": "bundle/dnspython-2.9.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "docstring_parser",
+          "Identifier": {
+            "PURL": "pkg:pypi/docstring-parser@0.18.0",
+            "UID": "86ad447df2d3cca1"
+          },
+          "Version": "0.18.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/docstring_parser-0.18.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "email-validator",
+          "Identifier": {
+            "PURL": "pkg:pypi/email-validator@2.3.0",
+            "UID": "c26cb87671c341dd"
+          },
+          "Version": "2.3.0",
+          "Licenses": [
+            "Unlicense"
+          ],
+          "FilePath": "bundle/email_validator-2.3.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "exceptiongroup",
+          "Identifier": {
+            "PURL": "pkg:pypi/exceptiongroup@1.3.1",
+            "UID": "c097ab5c94d316bf"
+          },
+          "Version": "1.3.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/exceptiongroup-1.3.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "fastmcp",
+          "Identifier": {
+            "PURL": "pkg:pypi/fastmcp@4.0.11",
+            "UID": "1ecab4bc683ff985"
+          },
+          "Version": "4.0.11",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/fastmcp-4.0.11.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "fastmcp-slim",
+          "Identifier": {
+            "PURL": "pkg:pypi/fastmcp-slim@4.0.11",
+            "UID": "c11f5b3d4d2c6397"
+          },
+          "Version": "4.0.11",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/fastmcp_slim-4.0.11.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "griffelib",
+          "Identifier": {
+            "PURL": "pkg:pypi/griffelib@2.3.2",
+            "UID": "421e957b527b9e72"
+          },
+          "Version": "2.3.2",
+          "Licenses": [
+            "ISC"
+          ],
+          "FilePath": "bundle/griffelib-2.3.2.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "h11",
+          "Identifier": {
+            "PURL": "pkg:pypi/h11@0.16.0",
+            "UID": "b8eb7bfdbb84bbcc"
+          },
+          "Version": "0.16.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/h11-0.16.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "httpcore",
+          "Identifier": {
+            "PURL": "pkg:pypi/httpcore@1.0.9",
+            "UID": "d0815b6d27392d9c"
+          },
+          "Version": "1.0.9",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/httpcore-1.0.9.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "httpcore2",
+          "Identifier": {
+            "PURL": "pkg:pypi/httpcore2@2.13.1",
+            "UID": "b621d5b0dacf0f39"
+          },
+          "Version": "2.13.1",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/httpcore2-2.13.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "httpx",
+          "Identifier": {
+            "PURL": "pkg:pypi/httpx@0.28.1",
+            "UID": "8945665a689cfefc"
+          },
+          "Version": "0.28.1",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/httpx-0.28.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "httpx2",
+          "Identifier": {
+            "PURL": "pkg:pypi/httpx2@2.13.1",
+            "UID": "82509c21c060bb1e"
+          },
+          "Version": "2.13.1",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/httpx2-2.13.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "idna",
+          "Identifier": {
+            "PURL": "pkg:pypi/idna@3.20",
+            "UID": "176fc6930156931a"
+          },
+          "Version": "3.20",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/idna-3.20.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jaraco.classes",
+          "Identifier": {
+            "PURL": "pkg:pypi/jaraco.classes@3.4.0",
+            "UID": "333a6b89f2124ded"
+          },
+          "Version": "3.4.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jaraco.classes-3.4.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jaraco.context",
+          "Identifier": {
+            "PURL": "pkg:pypi/jaraco.context@6.1.2",
+            "UID": "a981ca63f0d5391"
+          },
+          "Version": "6.1.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jaraco_context-6.1.2.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jaraco.functools",
+          "Identifier": {
+            "PURL": "pkg:pypi/jaraco.functools@4.6.0",
+            "UID": "403c849d4ed59a9"
+          },
+          "Version": "4.6.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jaraco_functools-4.6.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jeepney",
+          "Identifier": {
+            "PURL": "pkg:pypi/jeepney@0.9.0",
+            "UID": "2001901afd1568a6"
+          },
+          "Version": "0.9.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jeepney-0.9.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "joserfc",
+          "Identifier": {
+            "PURL": "pkg:pypi/joserfc@1.7.5",
+            "UID": "d90b1b396869410e"
+          },
+          "Version": "1.7.5",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/joserfc-1.7.5.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jsonref",
+          "Identifier": {
+            "PURL": "pkg:pypi/jsonref@1.1.0",
+            "UID": "da41df689fc5e4c6"
+          },
+          "Version": "1.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jsonref-1.1.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jsonschema",
+          "Identifier": {
+            "PURL": "pkg:pypi/jsonschema@4.26.0",
+            "UID": "cbad3112395a2241"
+          },
+          "Version": "4.26.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jsonschema-4.26.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jsonschema-path",
+          "Identifier": {
+            "PURL": "pkg:pypi/jsonschema-path@0.5.0",
+            "UID": "219116f44e5d7f28"
+          },
+          "Version": "0.5.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/jsonschema_path-0.5.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "jsonschema-specifications",
+          "Identifier": {
+            "PURL": "pkg:pypi/jsonschema-specifications@2025.9.1",
+            "UID": "6e3cc223d1a5135a"
+          },
+          "Version": "2025.9.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/jsonschema_specifications-2025.9.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "keyring",
+          "Identifier": {
+            "PURL": "pkg:pypi/keyring@25.7.0",
+            "UID": "411c5a15bb7d93f2"
+          },
+          "Version": "25.7.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/keyring-25.7.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "markdown-it-py",
+          "Identifier": {
+            "PURL": "pkg:pypi/markdown-it-py@4.2.0",
+            "UID": "74fea8aebf4600d4"
+          },
+          "Version": "4.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/markdown_it_py-4.2.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "mcp",
+          "Identifier": {
+            "PURL": "pkg:pypi/mcp@2.3.0",
+            "UID": "eb97f970db1682c1"
+          },
+          "Version": "2.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/mcp-2.3.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "mcp-types",
+          "Identifier": {
+            "PURL": "pkg:pypi/mcp-types@2.3.0",
+            "UID": "8bed12e67865dcbd"
+          },
+          "Version": "2.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/mcp_types-2.3.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "mcp-unifi",
+          "Identifier": {
+            "PURL": "pkg:pypi/mcp-unifi@0.25.0",
+            "UID": "3eedc4770c8201f8"
+          },
+          "Version": "0.25.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/mcp_unifi-0.25.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "mdurl",
+          "Identifier": {
+            "PURL": "pkg:pypi/mdurl@0.1.2",
+            "UID": "917408835319adab"
+          },
+          "Version": "0.1.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/mdurl-0.1.2.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "more-itertools",
+          "Identifier": {
+            "PURL": "pkg:pypi/more-itertools@11.1.0",
+            "UID": "1c9c5aa92da2a34c"
+          },
+          "Version": "11.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/more_itertools-11.1.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "openapi-pydantic",
+          "Identifier": {
+            "PURL": "pkg:pypi/openapi-pydantic@0.6.0",
+            "UID": "1d496d7d8b19022d"
+          },
+          "Version": "0.6.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/openapi_pydantic-0.6.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "opentelemetry-api",
+          "Identifier": {
+            "PURL": "pkg:pypi/opentelemetry-api@1.45.1",
+            "UID": "1540fe235320869f"
+          },
+          "Version": "1.45.1",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/opentelemetry_api-1.45.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "packaging",
+          "Identifier": {
+            "PURL": "pkg:pypi/packaging@26.3",
+            "UID": "ace7b3518becc341"
+          },
+          "Version": "26.3",
+          "Licenses": [
+            "Apache-2.0 OR BSD-2-Clause"
+          ],
+          "FilePath": "bundle/packaging-26.3.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "pathable",
+          "Identifier": {
+            "PURL": "pkg:pypi/pathable@0.6.0",
+            "UID": "8966f59994719b4c"
+          },
+          "Version": "0.6.0",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/pathable-0.6.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "platformdirs",
+          "Identifier": {
+            "PURL": "pkg:pypi/platformdirs@4.12.4",
+            "UID": "58244906ed45a430"
+          },
+          "Version": "4.12.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/platformdirs-4.12.4.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "py-key-value-aio",
+          "Identifier": {
+            "PURL": "pkg:pypi/py-key-value-aio@0.4.6",
+            "UID": "f7ffd3e6e8fdc244"
+          },
+          "Version": "0.4.6",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/py_key_value_aio-0.4.6.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "pycparser",
+          "Identifier": {
+            "PURL": "pkg:pypi/pycparser@3.11",
+            "UID": "5c09ebf363b8d37b"
+          },
+          "Version": "3.11",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/pycparser-3.11.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "pydantic",
+          "Identifier": {
+            "PURL": "pkg:pypi/pydantic@2.13.5",
+            "UID": "dcdc456eb3f37ed6"
+          },
+          "Version": "2.13.5",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/pydantic-2.13.5.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "pydantic-settings",
+          "Identifier": {
+            "PURL": "pkg:pypi/pydantic-settings@2.15.0",
+            "UID": "37aa21374333e6ab"
+          },
+          "Version": "2.15.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/pydantic_settings-2.15.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "pydantic_core",
+          "Identifier": {
+            "PURL": "pkg:pypi/pydantic-core@2.46.5",
+            "UID": "dc009dbf7f69e8a"
+          },
+          "Version": "2.46.5",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/pydantic_core-2.46.5.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "pyperclip",
+          "Identifier": {
+            "PURL": "pkg:pypi/pyperclip@1.11.0",
+            "UID": "504bc8ea19bf84b6"
+          },
+          "Version": "1.11.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/pyperclip-1.11.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "python-dotenv",
+          "Identifier": {
+            "PURL": "pkg:pypi/python-dotenv@1.2.4",
+            "UID": "2afcb2fb0adcdda"
+          },
+          "Version": "1.2.4",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/python_dotenv-1.2.4.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "python-multipart",
+          "Identifier": {
+            "PURL": "pkg:pypi/python-multipart@0.0.32",
+            "UID": "68428bba96ce6c42"
+          },
+          "Version": "0.0.32",
+          "Licenses": [
+            "Apache-2.0"
+          ],
+          "FilePath": "bundle/python_multipart-0.0.32.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "referencing",
+          "Identifier": {
+            "PURL": "pkg:pypi/referencing@0.37.0",
+            "UID": "d7e1b646436e5ca5"
+          },
+          "Version": "0.37.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/referencing-0.37.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "rich",
+          "Identifier": {
+            "PURL": "pkg:pypi/rich@15.0.0",
+            "UID": "4744cd9bf7914871"
+          },
+          "Version": "15.0.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/rich-15.0.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "rich-rst",
+          "Identifier": {
+            "PURL": "pkg:pypi/rich-rst@2.2.0",
+            "UID": "6a7c38c592bc175a"
+          },
+          "Version": "2.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/rich_rst-2.2.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "rpds-py",
+          "Identifier": {
+            "PURL": "pkg:pypi/rpds-py@2026.9.1",
+            "UID": "8a856973dd91b12e"
+          },
+          "Version": "2026.9.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/rpds_py-2026.9.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "sse-starlette",
+          "Identifier": {
+            "PURL": "pkg:pypi/sse-starlette@3.5.0",
+            "UID": "51078fb2dffbe7f1"
+          },
+          "Version": "3.5.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/sse_starlette-3.5.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "starlette",
+          "Identifier": {
+            "PURL": "pkg:pypi/starlette@1.7.0",
+            "UID": "e1b964ea0cd97bb0"
+          },
+          "Version": "1.7.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/starlette-1.7.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "truststore",
+          "Identifier": {
+            "PURL": "pkg:pypi/truststore@0.10.4",
+            "UID": "552d6a315bc3c6c8"
+          },
+          "Version": "0.10.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/truststore-0.10.4.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "typing-inspection",
+          "Identifier": {
+            "PURL": "pkg:pypi/typing-inspection@0.4.4",
+            "UID": "fc4c67b48f97b26c"
+          },
+          "Version": "0.4.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/typing_inspection-0.4.4.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "typing_extensions",
+          "Identifier": {
+            "PURL": "pkg:pypi/typing-extensions@4.16.0",
+            "UID": "88f4d48083524136"
+          },
+          "Version": "4.16.0",
+          "Licenses": [
+            "PSF-2.0"
+          ],
+          "FilePath": "bundle/typing_extensions-4.16.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "uncalled-for",
+          "Identifier": {
+            "PURL": "pkg:pypi/uncalled-for@0.4.1",
+            "UID": "a6e60f7794872314"
+          },
+          "Version": "0.4.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/uncalled_for-0.4.1.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "uvicorn",
+          "Identifier": {
+            "PURL": "pkg:pypi/uvicorn@0.54.0",
+            "UID": "4366ce2dc58ded3"
+          },
+          "Version": "0.54.0",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/uvicorn-0.54.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "watchfiles",
+          "Identifier": {
+            "PURL": "pkg:pypi/watchfiles@1.3.0",
+            "UID": "191a04e42aa1c56c"
+          },
+          "Version": "1.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "FilePath": "bundle/watchfiles-1.3.0.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        },
+        {
+          "Name": "websockets",
+          "Identifier": {
+            "PURL": "pkg:pypi/websockets@17.2",
+            "UID": "ca4337c7671f06c1"
+          },
+          "Version": "17.2",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "FilePath": "bundle/websockets-17.2.dist-info/METADATA",
+          "AnalyzedBy": "python-pkg"
+        }
+      ]
+    }
+  ]
+}

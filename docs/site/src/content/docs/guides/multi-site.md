@@ -4,6 +4,9 @@ title: Multi-Site Setup
 description: Configure mcp-unifi to manage multiple UniFi controllers from one server.
 ---
 
+This page retains upstream reference material. For this fork, follow [Hardened fork operations](/mcp-unifi/guides/hardening/). Build the checkout locally. No fork image or Registry entry has been published. Read-only, stdio, and verified TLS are the defaults; real writes need external operator grants.
+
+
 mcp-unifi can manage more than one UniFi controller from a single server instance. Every tool accepts an optional `controller: str = "default"` parameter; that parameter names one of the controllers in your config and routes the call to it.
 
 This is the architectural commitment that's painful to retrofit. It's the only feature that genuinely differentiates mcp-unifi from the competing UniFi MCP servers, and it's also the one most homelab operators end up wanting once they have more than one site (home + parents', home + office, etc).
@@ -84,12 +87,14 @@ The HTTP transport requires a bearer token — see the [Authentication guide](/m
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
 
 # Mount the YAML and point MCP_UNIFI_CONTROLLERS_FILE at it
-docker run --rm -p 3714:3714 \
+docker run --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=false \
   -e MCP_UNIFI_CONTROLLERS_FILE=/etc/mcp-unifi/controllers.yaml \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
   -v ./controllers.yaml:/etc/mcp-unifi/controllers.yaml:ro \
-  ghcr.io/pete-builds/mcp-unifi:latest
+  mcp-unifi:0.25.0
 ```
 
 ## Stub mode with two controllers
@@ -108,12 +113,14 @@ Stub mode honors the YAML config too. This is useful for testing multi-site flow
 ```bash
 export MCP_UNIFI_TOKEN=$(openssl rand -hex 32)
 
-docker run --rm -p 3714:3714 \
+docker run --rm -p 127.0.0.1:3714:3714 \
+  -e MCP_TRANSPORT=streamable-http \
+  -e MCP_HOST=0.0.0.0 \
   -e STUB_MODE=true \
   -e MCP_UNIFI_CONTROLLERS_FILE=/etc/mcp-unifi/controllers.yaml \
   -e MCP_UNIFI_AUTH_TOKENS="$MCP_UNIFI_TOKEN" \
   -v ./controllers.yaml:/etc/mcp-unifi/controllers.yaml:ro \
-  ghcr.io/pete-builds/mcp-unifi:latest
+  mcp-unifi:0.25.0
 ```
 
 Each controller gets its own in-memory state. Creating a VLAN on `home` does not affect `office`.
