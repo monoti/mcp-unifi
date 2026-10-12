@@ -363,3 +363,32 @@ def test_coerce_dry_run_refuses_to_guess() -> None:
     assert telemetry.coerce_dry_run(None) is None
     assert telemetry.coerce_dry_run("true") is None
     assert telemetry.coerce_dry_run(1) is None
+
+
+@pytest.mark.parametrize("handled", [False, True])
+async def test_scope_denial_marks_span_and_success_is_isolated(tracer, monkeypatch, handled):
+    from mcp_unifi.authority import Authority
+    from mcp_unifi.clients.errors import UniFiError, safe_error
+
+    monkeypatch.setenv("MCP_UNIFI_STDIO_PRINCIPAL", "alice")
+    authority = Authority(readonly=True, scopes={"alice": ["home"]}, grants=None, journal=None)
+
+    @audited("scope_span_probe", mutates=False)
+    async def probe(controller="office"):
+        try:
+            authority.check_scope(controller)
+        except UniFiError as exc:
+            if handled:
+                return {"error": safe_error(exc)}
+            raise
+        return {"success": True}
+
+    if handled:
+        assert "error" in await probe()
+    else:
+        with pytest.raises(UniFiError):
+            await probe()
+    assert tracer.spans[-1].attributes[telemetry.ATTR_DENIED_BY] == "scope"
+    await probe(controller="home")
+    assert tracer.spans[-1].attributes.get(telemetry.ATTR_DENIED_BY) in {None, ""}
+    assert tracer.spans[-1].attributes[telemetry.ATTR_OUTCOME] == telemetry.OUTCOME_OK

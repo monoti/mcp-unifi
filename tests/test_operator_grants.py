@@ -975,3 +975,298 @@ async def test_unexpected_intent_serialization_error_is_generic_and_blocks_backe
     finally:
         OPERATION.reset(token)
         await client.aclose()
+
+
+@pytest.mark.parametrize("change", ["none", "remove", "replace", "unhealthy"])
+async def test_write_retry_rechecks_live_authority(authority, change):
+    import logging
+
+    from mcp_unifi.clients.retry import request_with_retry
+
+    operation = Operation("alice", "retry_probe", {})
+    grant(authority, operation)
+
+    class RetryTransport(httpx.AsyncBaseTransport):
+        calls = 0
+
+        async def handle_async_request(self, request):
+            self.calls += 1
+            if self.calls == 1:
+                if change == "remove":
+                    authority.journal.unlink()
+                elif change == "replace":
+                    authority.journal.rename(authority.journal.with_suffix(".old"))
+                    initialize_journal(authority.journal)
+                elif change == "unhealthy":
+                    authority.healthy = False
+                raise httpx.ConnectError("synthetic connection failure", request=request)
+            return httpx.Response(200, json={"applied": True})
+
+    transport = RetryTransport()
+    async with httpx.AsyncClient(transport=transport) as client:
+        CLIENTS[client] = Target(authority, "home", "default")
+        token = OPERATION.set(operation)
+        try:
+            error = None
+            try:
+                response = await request_with_retry(
+                    client,
+                    "POST",
+                    "https://home.test/write",
+                    logger=logging.getLogger(__name__),
+                    service="UniFi",
+                    error_cls=UniFiError,
+                )
+            except UniFiError as exc:
+                error = exc
+            assert transport.calls == (2 if change == "none" else 1)
+            if change == "none":
+                assert error is None
+                assert response.json() == {"applied": True}
+                authority.complete(operation, "success")
+                with closing(sqlite3.connect(authority.journal)) as connection:
+                    assert connection.execute(
+                        "SELECT grant_id,outcome FROM attempts"
+                    ).fetchall() == [("grant-one", "success")]
+            else:
+                assert error is not None
+        finally:
+            OPERATION.reset(token)
+
+
+async def test_registered_scope_denial_is_skipped_by_replay(monkeypatch):
+    monkeypatch.setenv("MCP_UNIFI_STDIO_PRINCIPAL", "alice")
+    from mcp_unifi.cli.replay import replay_events
+
+    events = []
+
+    class Sink:
+        async def write(self, event):
+            events.append(event)
+
+        async def aclose(self):
+            pass
+
+    class ReplayTarget:
+        calls = 0
+
+        async def call_tool(self, name, arguments):
+            self.calls += 1
+            return {"success": True}
+
+    audit.set_audit_log(audit.AuditLog(Sink()))
+    server = build_server(
+        Settings(
+            _env_file=None,
+            stub_mode=True,
+            readonly=False,
+            auth_required=False,
+            controllers=[
+                ControllerConfig(name=name, host=f"{name}.test", api_key="synthetic")
+                for name in ["home", "office"]
+            ],
+            controller_scopes={"alice": ["home"]},
+        )
+    )
+    refusal = await server.call_tool(
+        "block_client",
+        {
+            "controller": "office",
+            "mac": "aa:bb:cc:00:00:01",
+        },
+    )
+    assert "error" in json.loads(refusal.content[0].text)
+    event = events[-1]
+    assert event.success is False
+    assert event.denied_by == "scope"
+    target = ReplayTarget()
+    result = (
+        await replay_events(
+            [event], stub_mode=True, target_controller=None, i_mean_it=False, server=target
+        )
+    )[0]
+    assert result.skipped is True
+    assert target.calls == 0
+    success = await server.call_tool(
+        "block_client",
+        {
+            "controller": "home",
+            "mac": "aa:bb:cc:00:00:01",
+        },
+    )
+    assert "error" not in json.loads(success.content[0].text)
+    assert events[-1].success is True
+    assert events[-1].denied_by is None
+    assert OPERATION.get() is None
+
+
+async def test_registered_empty_scope_write_denial_is_skipped_by_replay(authority):
+    from mcp_unifi.cli.replay import replay_events
+
+    events = []
+
+    class Sink:
+        async def write(self, event):
+            events.append(event)
+
+        async def aclose(self):
+            pass
+
+    class Transport(httpx.AsyncBaseTransport):
+        calls = 0
+
+        async def handle_async_request(self, request):
+            self.calls += 1
+            return httpx.Response(200, json={"data": []})
+
+    class ReplayTarget:
+        calls = 0
+
+        async def call_tool(self, name, arguments):
+            self.calls += 1
+            return {"success": True}
+
+    transport = Transport()
+    client = UniFiClient("synthetic.test", "synthetic")
+    await client._client.aclose()
+    client._client = httpx.AsyncClient(transport=transport)
+    audit.set_audit_log(audit.AuditLog(Sink()))
+    server = build_server(
+        Settings(
+            _env_file=None,
+            stub_mode=False,
+            readonly=False,
+            auth_required=False,
+            controllers=[
+                ControllerConfig(name="default", host="synthetic.test", api_key="synthetic")
+            ],
+            controller_scopes={},
+            approval_dir=authority.grants,
+            mutation_journal=authority.journal,
+        ),
+        unifi=client,
+    )
+    try:
+        refusal = await server.call_tool("block_client", {"mac": "aa:bb:cc:00:00:01"})
+        assert "error" in json.loads(refusal.content[0].text)
+        assert "Writable callers require an explicit controller scope." in refusal.content[0].text
+        assert transport.calls == 0
+        event = events[-1]
+        assert event.success is False
+        assert event.denied_by == "scope"
+        target = ReplayTarget()
+        result = (
+            await replay_events(
+                [event], stub_mode=True, target_controller=None, i_mean_it=False, server=target
+            )
+        )[0]
+        assert result.skipped is True
+        assert target.calls == 0
+        assert transport.calls == 0
+        assert OPERATION.get() is None
+    finally:
+        await client.aclose()
+
+
+async def test_raised_scope_denial_records_policy_and_resets_context(authority):
+    from mcp_unifi.modules._audit import audited
+
+    events = []
+
+    class Sink:
+        async def write(self, event):
+            events.append(event)
+
+        async def aclose(self):
+            pass
+
+    audit.set_audit_log(audit.AuditLog(Sink()))
+
+    @audited("raised_scope_probe", mutates=False)
+    async def probe(controller="office"):
+        authority.check_scope(controller)
+        return {"success": True}
+
+    with pytest.raises(UniFiError, match="not authorized"):
+        await probe()
+    assert events[-1].denied_by == "scope"
+    assert OPERATION.get() is None
+    await probe(controller="home")
+    assert events[-1].denied_by is None
+    assert events[-1].success is True
+
+
+async def test_backend_cancellation_records_uncertain_and_requires_fresh_grant(authority):
+    import logging
+
+    from mcp_unifi.clients.retry import request_with_retry
+    from mcp_unifi.modules import _audit
+
+    entered = asyncio.Event()
+    context_after = []
+
+    class BlockingTransport(httpx.AsyncBaseTransport):
+        calls = 0
+
+        async def handle_async_request(self, request):
+            self.calls += 1
+            if self.calls == 1:
+                entered.set()
+                await asyncio.Event().wait()
+            return httpx.Response(200, json={"applied": True})
+
+    transport = BlockingTransport()
+    async with httpx.AsyncClient(transport=transport) as client:
+        CLIENTS[client] = Target(authority, "home", "default")
+
+        @_audit.audited("backend_cancel_probe", mutates=True)
+        async def mutation():
+            response = await request_with_retry(
+                client,
+                "POST",
+                "https://home.test/write",
+                logger=logging.getLogger(__name__),
+                service="UniFi",
+                error_cls=UniFiError,
+            )
+            return response.json()
+
+        grant(authority, Operation("alice", "backend_cancel_probe", {}))
+
+        async def invoke():
+            try:
+                await mutation()
+            finally:
+                context_after.append((OPERATION.get(), _audit._ANNOTATIONS.get()))
+
+        task = asyncio.create_task(invoke())
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=5)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=5)
+            assert context_after == [(None, None)]
+            assert authority.healthy is True
+            with closing(sqlite3.connect(authority.journal)) as connection:
+                assert connection.execute("SELECT grant_id,outcome FROM attempts").fetchall() == [
+                    ("grant-one", "uncertain")
+                ]
+            with pytest.raises(UniFiError, match="already been consumed"):
+                await mutation()
+            assert transport.calls == 1
+            path = authority.grants / "grant.json"
+            fresh = json.loads(path.read_text())
+            fresh["id"] = "fresh-grant"
+            fresh_path = authority.grants / "fresh.json"
+            fresh_path.write_text(json.dumps(fresh))
+            fresh_path.chmod(0o600)
+            assert await mutation() == {"applied": True}
+            assert authority.healthy is True
+            assert transport.calls == 2
+            assert OPERATION.get() is None
+            with closing(sqlite3.connect(authority.journal)) as connection:
+                assert connection.execute(
+                    "SELECT grant_id,outcome FROM attempts ORDER BY grant_id"
+                ).fetchall() == [("fresh-grant", "success"), ("grant-one", "uncertain")]
+        finally:
+            task.cancel()
