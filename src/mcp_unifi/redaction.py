@@ -150,6 +150,7 @@ SENSITIVE_KEY_PATTERNS: frozenset[str] = frozenset(
         "x_dh_key",
         "x_shared_client_key",
         "x_auth_key",
+        "iapp_key",
     }
 )
 
@@ -177,6 +178,7 @@ NON_SECRET_KEYS: frozenset[str] = frozenset(
         "access_api_key_file",
         "os_password_file",
         "auth_token_file",
+        "private_preshared_keys_enabled",
     }
 )
 
