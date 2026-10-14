@@ -16,8 +16,13 @@ hardening regresses:
 
 from __future__ import annotations
 
+import json
+from copy import deepcopy
+
 import pytest
 
+from mcp_unifi.clients.stubs import StubState
+from mcp_unifi.config import Settings
 from mcp_unifi.redaction import (
     REDACTED,
     REDACTED_OUTPUT,
@@ -25,11 +30,17 @@ from mcp_unifi.redaction import (
     redact,
     scrub,
 )
+from mcp_unifi.server import build_server
 
 # Field names taken from real UniFi controller records. The comment on each is
 # the record type it appears on, because "is this a real field" is the question
 # a reader will have first.
 SECRET_KEYS = [
+    "x_iapp_key",
+    "iapp_key",
+    "private_preshared_keys",
+    "private_preshared_keys_enabled_secret",
+    "x_private_preshared_keys_enabled",
     "x_passphrase",  # wlanconf: WPA pre-shared key
     "x_ipsec_pre_shared_key",  # networkconf: site-to-site IPsec PSK
     "x_preshared_key",  # networkconf: WireGuard peer pre-shared key
@@ -60,6 +71,7 @@ SECRET_KEYS = [
 # is the concrete near-miss that ruled out a broader pattern — see the
 # rejected-candidates list in ``mcp_unifi.redaction``.
 NON_SECRET_KEYS = [
+    "private_preshared_keys_enabled",
     # ruled out a bare ``radius`` pattern
     "radiusprofile_id",
     "radius_profile_name",
@@ -110,6 +122,70 @@ def test_is_sensitive_matches_secret_keys(key: str) -> None:
 @pytest.mark.parametrize("key", NON_SECRET_KEYS)
 def test_is_sensitive_leaves_references_alone(key: str) -> None:
     assert is_sensitive(key) is False
+    assert is_sensitive(key.upper()) is False
+
+
+@pytest.mark.parametrize("transform,sentinel", [(redact, REDACTED_OUTPUT), (scrub, REDACTED)])
+@pytest.mark.parametrize("enabled", [True, False])
+def test_nested_wlan_credentials_are_hidden_and_enabled_flag_survives(
+    transform, sentinel: str, enabled: bool
+) -> None:
+    wlan = {
+        "name": "Synthetic WLAN",
+        "X_IAPP_KEY": "fake-iapp-do-not-leak",
+        "PRIVATE_PRESHARED_KEYS_ENABLED": enabled,
+        "private_preshared_keys": [{"name": "Guest", "key": "fake-ppsk-do-not-leak"}],
+        "private_preshared_keys_enabled_secret": "fake-near-match-do-not-leak",
+        "x_private_preshared_keys_enabled": "fake-prefixed-do-not-leak",
+    }
+    payload = {"wlans": [wlan], "nested": ({"wlans": [wlan]},)}
+    original = deepcopy(payload)
+
+    out = transform(payload)
+
+    expected = {
+        "name": "Synthetic WLAN",
+        "X_IAPP_KEY": sentinel,
+        "PRIVATE_PRESHARED_KEYS_ENABLED": enabled,
+        "private_preshared_keys": sentinel,
+        "private_preshared_keys_enabled_secret": sentinel,
+        "x_private_preshared_keys_enabled": sentinel,
+    }
+    assert out == {"wlans": [expected], "nested": ({"wlans": [expected]},)}
+    assert "do-not-leak" not in repr(out)
+    assert payload == original
+
+
+async def test_list_wlans_hides_iapp_and_private_passwords_in_readonly_mode() -> None:
+    settings = Settings(readonly=True, stub_mode=True, auth_required=False)
+    state = StubState()
+    state.wlans = [
+        {
+            "_id": "synthetic-wlan",
+            "name": "Synthetic WLAN",
+            "x_iapp_key": "fake-iapp-do-not-leak",
+            "private_preshared_keys_enabled": True,
+            "private_preshared_keys": [{"key": "fake-ppsk-do-not-leak"}],
+        }
+    ]
+    original = deepcopy(state.wlans)
+    server = build_server(settings, stub=state)
+
+    result = await server.call_tool("list_wlans", {})
+    text = "".join(getattr(content, "text", "") for content in result.content)
+    out = json.loads(text)
+
+    assert out == [
+        {
+            "_id": "synthetic-wlan",
+            "name": "Synthetic WLAN",
+            "x_iapp_key": REDACTED_OUTPUT,
+            "private_preshared_keys_enabled": True,
+            "private_preshared_keys": REDACTED_OUTPUT,
+        }
+    ]
+    assert "do-not-leak" not in text
+    assert state.wlans == original
 
 
 def test_redact_covers_a_full_vpn_network_record() -> None:
